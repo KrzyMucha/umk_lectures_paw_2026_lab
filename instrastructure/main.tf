@@ -36,3 +36,11 @@ resource "google_storage_bucket_object" "hello_source" {
   bucket = google_storage_bucket.functions_source.name
   source = data.archive_file.hello_source.output_path
 }
+
+module "hello_functions" {
+  source = "../services/hello-team/functions"
+
+  region                  = var.region
+  functions_source_bucket = google_storage_bucket.functions_source.name
+  hello_source_object     = google_storage_bucket_object.hello_source.name
+}

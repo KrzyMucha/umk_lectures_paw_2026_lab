@@ -9,8 +9,8 @@ resource "google_cloudfunctions2_function" "hello_szymon_orzechowski" {
     entry_point = "handler"
     source {
       storage_source {
-        bucket = google_storage_bucket.functions_source.name
-        object = google_storage_bucket_object.hello_source.name
+        bucket = var.functions_source_bucket
+        object = var.hello_source_object
       }
     }
   }
