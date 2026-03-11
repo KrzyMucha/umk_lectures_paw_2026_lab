@@ -12,6 +12,7 @@ use Symfony\Component\Routing\Attribute\Route;
 class OfferController extends AbstractController
 {
     #[Route('', methods: ['GET'])]
+    #[Route('/', methods: ['GET'])]
     public function index(): JsonResponse
     {
         $offers = [
