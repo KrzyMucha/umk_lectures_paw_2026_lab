@@ -18,9 +18,10 @@ class OfferController extends AbstractController
             new Offer('iPhone 15', 'Nowy, zafoliowany', 4999.99),
             new Offer('MacBook Pro', '16 cali, M3', 12999.99),
         ];
-    
+
         return $this->json(
-            array_map(fn($o) => $o->toArray(), $offers)
+            array_map(fn(Offer $offer) => $offer->toArray(), $offers),
+            Response::HTTP_OK,
         );
     }
 }
