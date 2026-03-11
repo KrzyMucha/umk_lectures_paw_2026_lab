@@ -1,0 +1,10 @@
+.git
+.gitignore
+vendor/
+var/cache/
+var/log/
+docker-compose.yml
+Dockerfile
+README.md
+.env.local
+.env.*.local
