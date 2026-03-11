@@ -9,3 +9,9 @@ variable "region" {
   type        = string
   default     = "europe-central2"
 }
+
+variable "app_secret" {
+  description = "Symfony APP_SECRET"
+  type        = string
+  default     = "change-me-in-production"
+}

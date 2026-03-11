@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 1
+      APP_SECRET: dev-secret-change-in-production
+
+volumes:
+  vendor_data:

@@ -1,16 +1,16 @@
-# Hello function for Szymon W
-resource "google_cloudfunctions2_function" "hello_szymon_w" {
-  name        = "hello-szymon-w"
+# Hello function for Szymon Wojciechowski
+resource "google_cloudfunctions2_function" "hello_szymon_wojciechowski" {
+  name        = "hello-szymon-wojciechowski"
   location    = var.region
-  description = "Hello from Szymon W - Zespół 1"
+  description = "Hello from Szymon Wojciechowski - Zespół 1"
 
   build_config {
     runtime     = "nodejs20"
     entry_point = "handler"
     source {
       storage_source {
-        bucket = google_storage_bucket.functions_source.name
-        object = google_storage_bucket_object.hello_source.name
+        bucket = var.functions_source_bucket
+        object = var.hello_source_object
       }
     }
   }
@@ -23,19 +23,19 @@ resource "google_cloudfunctions2_function" "hello_szymon_w" {
 
   labels = {
     team   = "zespol-1"
-    author = "szymon-w"
+    author = "szymon-wojciechowski"
   }
 }
 
 # Allow unauthenticated access
-resource "google_cloud_run_v2_service_iam_member" "hello_szymon_w_public" {
-  location = google_cloudfunctions2_function.hello_szymon_w.location
-  name     = google_cloudfunctions2_function.hello_szymon_w.name
+resource "google_cloud_run_v2_service_iam_member" "hello_szymon_wojciechowski_public" {
+  location = google_cloudfunctions2_function.hello_szymon_wojciechowski.location
+  name     = google_cloudfunctions2_function.hello_szymon_wojciechowski.name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 # Output URL
-output "hello_szymon_w_url" {
-  value = google_cloudfunctions2_function.hello_szymon_w.service_config[0].uri
+output "hello_szymon_wojciechowski_url" {
+  value = google_cloudfunctions2_function.hello_szymon_wojciechowski.service_config[0].uri
 }
