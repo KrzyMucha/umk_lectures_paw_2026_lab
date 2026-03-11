@@ -1,8 +1,8 @@
-# Hello function for {Imię}
-resource "google_cloudfunctions2_function" "hello_{szymon}" {
-  name        = "hello-{Szymon}"
+# Hello function for Szymon W
+resource "google_cloudfunctions2_function" "hello_szymon_w" {
+  name        = "hello-szymon-w"
   location    = var.region
-  description = "Hello from {Szymon} - Zespół {N}"
+  description = "Hello from Szymon W - Zespół 1"
 
   build_config {
     runtime     = "nodejs20"
@@ -22,20 +22,20 @@ resource "google_cloudfunctions2_function" "hello_{szymon}" {
   }
 
   labels = {
-    team   = "zespol-{n}"
-    author = "{imie}"
+    team   = "zespol-1"
+    author = "szymon-w"
   }
 }
 
 # Allow unauthenticated access
-resource "google_cloud_run_v2_service_iam_member" "hello_{imie}_public" {
-  location = google_cloudfunctions2_function.hello_{imie}.location
-  name     = google_cloudfunctions2_function.hello_{imie}.name
+resource "google_cloud_run_v2_service_iam_member" "hello_szymon_w_public" {
+  location = google_cloudfunctions2_function.hello_szymon_w.location
+  name     = google_cloudfunctions2_function.hello_szymon_w.name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 # Output URL
-output "hello_{imie}_url" {
-  value = google_cloudfunctions2_function.hello_{imie}.service_config[0].uri
+output "hello_szymon_w_url" {
+  value = google_cloudfunctions2_function.hello_szymon_w.service_config[0].uri
 }
