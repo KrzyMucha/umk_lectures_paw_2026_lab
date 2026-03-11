@@ -1,0 +1,7 @@
+# Skopiuj ten plik jako terraform.tfvars i uzupełnij wartości
+# terraform.tfvars jest w .gitignore - nie commituj go!
+
+project_id      = "project-f5f4f6f0-acae-485b-a16"
+region          = "us-central1"
+repository_name = "offers-repo"
+service_name    = "offers-api"

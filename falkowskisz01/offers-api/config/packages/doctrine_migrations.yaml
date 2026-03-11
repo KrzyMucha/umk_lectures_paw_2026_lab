@@ -1,4 +1,1 @@
-doctrine_migrations:
-  migrations_paths:
-    "DoctrineMigrations": "%kernel.project_dir%/migrations"
-  enable_profiler: false
+# Doctrine migrations disabled - using dummy data
