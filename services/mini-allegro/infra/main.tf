@@ -20,6 +20,11 @@ resource "google_artifact_registry_repository" "mini_allegro" {
   description   = "Docker repository for mini-allegro"
 }
 
+import {
+  id = "projects/${var.project}/locations/${var.region}/services/${var.service_name}"
+  to = google_cloud_run_v2_service.mini_allegro
+}
+
 resource "google_cloud_run_v2_service" "mini_allegro" {
   name     = var.service_name
   location = var.region

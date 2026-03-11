@@ -2,9 +2,9 @@
 
 ## Wymagania
 
-- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.0
-- [gcloud CLI](https://cloud.google.com/sdk/docs/install)
-- [Docker](https://docs.docker.com/get-docker/) z obsługą buildx
+-   [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.0
+-   [gcloud CLI](https://cloud.google.com/sdk/docs/install)
+-   [Docker](https://docs.docker.com/get-docker/) z obsługą buildx
 
 ---
 
@@ -71,3 +71,9 @@ terraform apply (Artifact Registry) → docker push → terraform apply (Cloud R
 ```
 
 > Artifact Registry musi istnieć przed pushem obrazu. Cloud Run musi być wdrożony po pushu obrazu.
+
+```shell
+gcloud run deploy mini-allegro \
+    --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
+    --region europe-central2
+```
