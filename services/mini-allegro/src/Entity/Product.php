@@ -21,7 +21,7 @@ class Product
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
+    #[ORM\Column(type: 'float')]
     private float $price;
 
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ProductReview::class, cascade: ['persist', 'remove'])]

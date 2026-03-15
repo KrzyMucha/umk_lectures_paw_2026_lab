@@ -11,6 +11,9 @@ FROM base AS dev
 
 ENV APP_ENV=dev
 
+COPY composer.json composer.lock* ./
+RUN composer install --no-scripts
+
 CMD ["php", "-S", "0.0.0.0:8080", "-t", "public"]
 
 # --- prod stage ---
