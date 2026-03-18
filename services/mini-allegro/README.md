@@ -64,6 +64,35 @@ curl $(terraform output -raw service_url)/offers
 
 ---
 
+## Testy (Python, bez PHPUnit)
+
+Testy API są w katalogu [services/mini-allegro/tests_python](services/mini-allegro/tests_python) i używają `pytest`.
+
+### Uruchomienie lokalne
+
+1. Uruchom aplikację (np. przez Docker Compose):
+
+```bash
+docker compose up -d --build
+```
+
+2. Zainstaluj zależności testowe i uruchom testy:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+Domyślnie testy strzelają pod `http://localhost:8080`. Możesz zmienić URL:
+
+```bash
+APP_BASE_URL=https://twoj-serwis.run.app pytest
+```
+
+---
+
 ## Kolejność operacji
 
 ```
