@@ -6,8 +6,8 @@ on:
       - develop
       - main
     paths:
-      - 'services/mini-allegro/**'
-      - '.github/workflows/deploy.yml'
+      - "services/mini-allegro/**"
+      - ".github/workflows/deploy.yml"
 
 env:
   PROJECT_ID: project-f5f4f6f0-acae-485b-a16
@@ -19,8 +19,63 @@ env:
   SERVICE_PROD: mini-allegro-prod
 
 jobs:
+  python-api-tests:
+    name: Python API tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        working-directory: services/mini-allegro
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Start application stack
+        working-directory: services/mini-allegro
+        run: docker compose up -d --build
+
+      - name: Wait for health endpoint
+        working-directory: services/mini-allegro
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/health > /dev/null; then
+              echo "Application is healthy"
+              exit 0
+            fi
+            echo "Waiting for app... ($i/30)"
+            sleep 5
+          done
+          echo "Application did not become healthy in time"
+          docker compose logs
+          exit 1
+
+      - name: Run Python API tests
+        working-directory: services/mini-allegro
+        env:
+          APP_BASE_URL: http://localhost:8080
+        run: pytest
+
+      - name: Show container logs on failure
+        if: failure()
+        working-directory: services/mini-allegro
+        run: docker compose logs
+
+      - name: Stop application stack
+        if: always()
+        working-directory: services/mini-allegro
+        run: docker compose down -v
+
   build:
     name: Build & Push Docker image
+    needs: python-api-tests
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
