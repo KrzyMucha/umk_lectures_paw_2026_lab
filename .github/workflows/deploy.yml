@@ -97,6 +97,10 @@ jobs:
           fi
           echo "Health check passed!"
 
+      - name: Checkout code for PR
+        if: github.ref == 'refs/heads/develop'
+        uses: actions/checkout@v4
+
       - name: Create PR to main
         if: github.ref == 'refs/heads/develop'
         run: |
