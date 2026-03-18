@@ -28,7 +28,7 @@ gcloud auth configure-docker europe-central2-docker.pkg.dev
 ```bash
 cd infra
 terraform init
-terraform apply
+terraform apply -var="alert_email=twoj.email@domena.pl"
 ```
 
 ---
@@ -51,7 +51,7 @@ docker buildx build --platform linux/amd64 --target prod \
 
 ```bash
 cd infra
-terraform apply
+terraform apply -var="alert_email=twoj.email@domena.pl"
 ```
 
 ---
@@ -59,8 +59,56 @@ terraform apply
 ## 5. Weryfikacja
 
 ```bash
+# Offers
 curl $(terraform output -raw service_url)/offers
+
+# Users
+curl $(terraform output -raw service_url)/users
+
+# Purchases (all)
+curl $(terraform output -raw service_url)/purchases
+
+# Purchases by offer
+curl $(terraform output -raw service_url)/purchases/offer/1
+
+# Health check
+curl $(terraform output -raw service_url)/health
 ```
+
+### Log Explorer (Cloud Logging)
+
+W Cloud Logging -> Log Explorer użyj filtra:
+
+```text
+resource.type="cloud_run_revision"
+resource.labels.service_name="mini-allegro"
+severity>=WARNING
+```
+
+To pokaże warningi i błędy aplikacji z Cloud Run.
+
+### Testowanie Alert Policy (5+ błędów w 5 minut)
+
+1. **Endpoint testowy** – aplikacja ma endpoint `/health/error` który logruje ERROR i zwraca 500:
+
+```bash
+curl $(terraform output -raw service_url)/health/error
+```
+
+2. **Wyzwolenie alertu** – aby wyzwolić alertę, wyślij 5+ błędów w ciągu 5 minut:
+
+```bash
+# Bash loop – wysyła 10 błędów ciągle
+for i in {1..10}; do
+  curl -s $(terraform output -raw service_url)/health/error
+  sleep 5  # opóźnienie między każdym błędem
+done
+```
+
+3. **Weryfikacja**:
+   - W Cloud Logging -> Logs Explorer, przefiltruj po severity=ERROR, resource.labels.service_name="mini-allegro"
+   - W Cloud Monitoring -> Alerting -> Policies, sprawdź status "mini-allegro Cloud Run error burst"
+   - Email powinnien przyjść na adres podany w `alert_email` w ciągu ~1 minuty od przekroczenia progu
 
 ---
 

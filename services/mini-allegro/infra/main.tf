@@ -69,3 +69,61 @@ resource "google_cloud_run_v2_service_iam_member" "public_access" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+resource "google_logging_metric" "cloud_run_error_count" {
+  name        = "mini_allegro_cloud_run_error_count"
+  description = "Counts ERROR and higher severity logs emitted by mini-allegro Cloud Run service"
+  filter = join(" AND ", [
+    "resource.type=\"cloud_run_revision\"",
+    "resource.labels.service_name=\"${var.service_name}\"",
+    "severity>=ERROR",
+  ])
+}
+
+resource "google_monitoring_notification_channel" "email" {
+  display_name = "mini-allegro-alert-email"
+  type         = "email"
+
+  labels = {
+    email_address = var.alert_email
+  }
+}
+
+resource "google_monitoring_alert_policy" "cloud_run_error_burst" {
+  display_name = "mini-allegro Cloud Run error burst"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "5+ errors in 5 minutes"
+
+    condition_threshold {
+      filter = join(" AND ", [
+        "metric.type=\"logging.googleapis.com/user/${google_logging_metric.cloud_run_error_count.name}\"",
+        "resource.type=\"cloud_run_revision\"",
+        "resource.labels.service_name=\"${var.service_name}\"",
+      ])
+      comparison      = "COMPARISON_GT"
+      threshold_value = 4
+      duration        = "0s"
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["resource.label.service_name"]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.name]
+
+  alert_strategy {
+    auto_close = "1800s"
+  }
+
+  enabled = true
+}
