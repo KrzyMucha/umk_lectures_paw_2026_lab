@@ -89,7 +89,7 @@ jobs:
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "DEV URL: $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
           echo "HTTP Status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "Health check failed! Got HTTP $STATUS"
@@ -150,7 +150,7 @@ jobs:
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "PROD URL: $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
           echo "HTTP Status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "Health check failed! Got HTTP $STATUS"
