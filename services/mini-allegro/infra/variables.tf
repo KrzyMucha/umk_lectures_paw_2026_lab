@@ -15,3 +15,8 @@ variable "service_name" {
   type        = string
   default     = "mini-allegro"
 }
+
+variable "alert_email" {
+  description = "Email for Cloud Monitoring alert notifications"
+  type        = string
+}
