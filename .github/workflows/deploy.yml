@@ -97,6 +97,23 @@ jobs:
           fi
           echo "Health check passed!"
 
+      - name: Create PR to main
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          EXISTING=$(gh pr list --base main --head develop --state open --json number --jq length)
+          if [ "$EXISTING" = "0" ]; then
+            gh pr create \
+              --base main \
+              --head develop \
+              --title "Deploy to PROD [$(date +'%Y-%m-%d %H:%M')] - ${{ github.sha }}" \
+              --body "Health check na DEV przeszedł ✅. Zatwierdź PR aby deployować na PROD."
+            echo "PR created."
+          else
+            echo "PR already exists, skipping."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   deploy-prod:
     name: Deploy to PROD
     needs: [build, deploy-dev]
