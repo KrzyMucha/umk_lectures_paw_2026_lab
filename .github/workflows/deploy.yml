@@ -79,12 +79,7 @@ jobs:
             APP_ENV=dev
             DATABASE_URL=${{ secrets.DEV_DATABASE_URL }}
 
-      # - name: Allow public access to Cloud Run DEV
-      #   run: |
-      #     gcloud run services add-iam-policy-binding ${{ env.SERVICE_DEV }} \
-      #       --region=${{ env.REGION }} \
-      #       --member="allUsers" \
-      #       --role="roles/run.invoker"
+     
 
       - name: Check DEV health (HTTP 200)
         run: |
