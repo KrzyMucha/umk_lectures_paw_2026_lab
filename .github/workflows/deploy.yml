@@ -157,6 +157,8 @@ jobs:
             exit 1
           fi
           echo "Health check passed!"
+          echo "### DEV Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** [${URL}](${URL})" >> $GITHUB_STEP_SUMMARY
 
       - name: Checkout code for PR
         if: github.ref == 'refs/heads/develop'
@@ -222,3 +224,5 @@ jobs:
             exit 1
           fi
           echo "Health check passed!"
+          echo "### PROD Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** [${URL}](${URL})" >> $GITHUB_STEP_SUMMARY
