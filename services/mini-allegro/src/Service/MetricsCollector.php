@@ -14,49 +14,51 @@ class MetricsCollector
         private readonly CacheItemPoolInterface $cache,
     ) {}
 
-    public function increment(string $endpoint, int $statusCode): void
-    {
-        $key = $this->key($endpoint, $statusCode);
-        $item = $this->cache->getItem($key);
-        $item->set(($item->isHit() ? (int) $item->get() : 0) + 1);
-        $item->expiresAfter(self::TTL);
-        $this->cache->save($item);
-    }
-
+    /**
+     * @return list<array{endpoint: string, status_code: int, count: int}>
+     */
     public function getAll(): array
     {
         $indexItem = $this->cache->getItem('metrics_index');
-        $keys = $indexItem->isHit() ? (array) $indexItem->get() : [];
+        $index = $indexItem->isHit() ? (array) $indexItem->get() : [];
 
-        $metrics = [];
-        foreach ($keys as $key) {
-            $item = $this->cache->getItem($key);
+        $result = [];
+        foreach ($index as $entry) {
+            $item = $this->cache->getItem($entry['key']);
             if ($item->isHit()) {
-                $metrics[$key] = (int) $item->get();
+                $result[] = [
+                    'endpoint'    => $entry['endpoint'],
+                    'status_code' => $entry['status_code'],
+                    'count'       => (int) $item->get(),
+                ];
             }
         }
 
-        return $metrics;
+        return $result;
     }
 
     public function track(string $endpoint, int $statusCode): void
     {
-        $key = $this->key($endpoint, $statusCode);
+        $key = $this->cacheKey($endpoint, $statusCode);
 
         $indexItem = $this->cache->getItem('metrics_index');
-        $keys = $indexItem->isHit() ? (array) $indexItem->get() : [];
+        $index = $indexItem->isHit() ? (array) $indexItem->get() : [];
 
-        if (!in_array($key, $keys, true)) {
-            $keys[] = $key;
-            $indexItem->set($keys);
+        $exists = count(array_filter($index, fn(array $e) => $e['key'] === $key)) > 0;
+        if (!$exists) {
+            $index[] = ['key' => $key, 'endpoint' => $endpoint, 'status_code' => $statusCode];
+            $indexItem->set($index);
             $indexItem->expiresAfter(self::TTL);
             $this->cache->save($indexItem);
         }
 
-        $this->increment($endpoint, $statusCode);
+        $countItem = $this->cache->getItem($key);
+        $countItem->set(($countItem->isHit() ? (int) $countItem->get() : 0) + 1);
+        $countItem->expiresAfter(self::TTL);
+        $this->cache->save($countItem);
     }
 
-    private function key(string $endpoint, int $statusCode): string
+    private function cacheKey(string $endpoint, int $statusCode): string
     {
         $safe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', ltrim($endpoint, '/'));
 
