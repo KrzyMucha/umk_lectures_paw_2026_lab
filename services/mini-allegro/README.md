@@ -106,9 +106,9 @@ done
 ```
 
 3. **Weryfikacja**:
-   - W Cloud Logging -> Logs Explorer, przefiltruj po severity=ERROR, resource.labels.service_name="mini-allegro"
-   - W Cloud Monitoring -> Alerting -> Policies, sprawdź status "mini-allegro Cloud Run error burst"
-   - Email powinnien przyjść na adres podany w `alert_email` w ciągu ~1 minuty od przekroczenia progu
+    - W Cloud Logging -> Logs Explorer, przefiltruj po severity=ERROR, resource.labels.service_name="mini-allegro"
+    - W Cloud Monitoring -> Alerting -> Policies, sprawdź status "mini-allegro Cloud Run error burst"
+    - Email powinnien przyjść na adres podany w `alert_email` w ciągu ~1 minuty od przekroczenia progu
 
 ---
 
@@ -139,6 +139,18 @@ Domyślnie testy strzelają pod `http://localhost:8080`. Możesz zmienić URL:
 APP_BASE_URL=https://twoj-serwis.run.app pytest
 ```
 
+### GitHub Actions + GCP (Cloud Run)
+
+Workflow CI uruchamia:
+
+- testy lokalne na `docker compose` (zawsze),
+- testy pod wdrożony URL z GCP (opcjonalnie).
+
+Aby uruchamiać testy pod Cloud Run w GitHub Actions, ustaw w repo:
+
+- `Settings -> Secrets and variables -> Actions -> Variables`
+- zmienną `GCP_APP_BASE_URL`, np. `https://mini-allegro-xxxxx-ew.a.run.app`
+
 ---
 
 ## Kolejność operacji
@@ -153,4 +165,40 @@ terraform apply (Artifact Registry) → docker push → terraform apply (Cloud R
 gcloud run deploy mini-allegro \
     --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
     --region europe-central2
+```
+
+## Deploy PROD z automatycznym rollbackiem
+
+W repo jest gotowy skrypt: `scripts/deploy_prod_with_rollback.sh`.
+
+Co robi:
+
+-   zapamiętuje poprzednią rewizję Cloud Run,
+-   deployuje nową rewizję,
+-   wykonuje healthcheck,
+-   przy błędzie wykonuje rollback ruchem 100% na poprzednią rewizję przez:
+    `gcloud run services update-traffic`.
+
+Użycie:
+
+```bash
+chmod +x scripts/deploy_prod_with_rollback.sh
+
+./scripts/deploy_prod_with_rollback.sh \
+  --service mini-allegro \
+  --region europe-central2 \
+  --project project-f5f4f6f0-acae-485b-a16 \
+  --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest
+```
+
+Opcjonalnie możesz zmienić endpoint healthcheck i retry:
+
+```bash
+./scripts/deploy_prod_with_rollback.sh \
+  --service mini-allegro \
+  --region europe-central2 \
+  --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
+  --health-path /health \
+  --retries 12 \
+  --sleep-seconds 5
 ```

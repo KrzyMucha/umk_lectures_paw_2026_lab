@@ -21,6 +21,11 @@ resource "google_artifact_registry_repository" "mini_allegro" {
 }
 
 import {
+  id = "projects/${var.project}/locations/${var.region}/repositories/mini-allegro"
+  to = google_artifact_registry_repository.mini_allegro
+}
+
+import {
   id = "projects/${var.project}/locations/${var.region}/services/${var.service_name}"
   to = google_cloud_run_v2_service.mini_allegro
 }
@@ -93,6 +98,28 @@ resource "google_monitoring_alert_policy" "cloud_run_error_burst" {
   display_name = "mini-allegro Cloud Run error burst"
   combiner     = "OR"
 
+  documentation {
+    subject   = "[mini-allegro] 5+ ERROR logs in 5 minutes"
+    mime_type = "text/markdown"
+    content   = <<-EOT
+      Wykryto nagromadzenie błędów aplikacji mini-allegro.
+
+      **Warunek alertu:** więcej niż 4 logi o `severity>=ERROR` w 5 minut (czyli 5+ błędów).
+
+      **Co sprawdzić od razu:**
+      1. Cloud Logging -> Logs Explorer
+      2. Użyj filtra:
+
+      ```
+      resource.type="cloud_run_revision"
+      resource.labels.service_name="mini-allegro"
+      severity>=ERROR
+      ```
+
+      **Uwaga:** mail alertowy z Cloud Monitoring nie dołącza pełnej listy treści logów; szczegółowy opis błędów jest w Cloud Logging.
+    EOT
+  }
+
   conditions {
     display_name = "5+ errors in 5 minutes"
 
@@ -110,7 +137,7 @@ resource "google_monitoring_alert_policy" "cloud_run_error_burst" {
         alignment_period     = "300s"
         per_series_aligner   = "ALIGN_SUM"
         cross_series_reducer = "REDUCE_SUM"
-        group_by_fields      = ["resource.label.service_name"]
+        group_by_fields      = ["resource.labels.service_name"]
       }
 
       trigger {
