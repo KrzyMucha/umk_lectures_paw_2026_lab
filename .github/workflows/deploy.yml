@@ -157,7 +157,7 @@ jobs:
             exit 1
           fi
           echo "Health check passed!"
-          PR_URL=$(gh pr list --base main --head develop --state open --json url --jq '.[0].url // ""')
+          PR_URL=$(gh pr list --repo ${{ github.repository }} --base main --head develop --state open --json url --jq '.[0].url // ""')
           echo "### DEV Deployment" >> $GITHUB_STEP_SUMMARY
           echo "- **Aplikacja (DEV):** [${URL}](${URL})" >> $GITHUB_STEP_SUMMARY
           echo "- **Health endpoint:** [${URL}/health](${URL}/health)" >> $GITHUB_STEP_SUMMARY
