@@ -48,7 +48,7 @@ jobs:
 
       - name: Verify Symfony runtime autoloader
         working-directory: services/mini-allegro
-        run: test -f vendor/autoload_runtime.php
+        run: docker compose exec -T app test -f vendor/autoload_runtime.php
 
       - name: Wait for health endpoint
         working-directory: services/mini-allegro
