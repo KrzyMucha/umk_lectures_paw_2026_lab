@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM dunglas/frankenphp:php8.3-alpine AS base
 
 RUN install-php-extensions pdo_pgsql opcache intl zip
@@ -23,11 +24,13 @@ RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
     >> "$PHP_INI_DIR/conf.d/opcache.ini"
 
 COPY composer.json composer.lock* ./
-RUN composer install --no-dev --no-scripts --no-autoloader
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --no-dev --no-scripts --no-autoloader
 
 COPY . .
 
-RUN composer dump-autoload --optimize --classmap-authoritative && \
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer dump-autoload --optimize --classmap-authoritative && \
     php bin/console cache:warmup
 
 EXPOSE 8080

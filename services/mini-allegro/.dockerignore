@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+.gcloudignore
+
+# Symfony cache / logs
+/var/
+
+# Composer deps (re-installed during build)
+/vendor/
+
+# Docker files
+docker-compose*.yml
+compose.override.yaml
+Dockerfile
+
+# Python test env
+/.venv
+/.pytest_cache
+/tests_python/
+__pycache__/
+
+# Infra
+/infra/
+
+# Local env overrides
+.env.local
+.env.local.php
+.env.*.local
+
+# Editor
+.editorconfig
+*.md
