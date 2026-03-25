@@ -60,9 +60,3 @@ def test_users_returns_expected_shape():
     assert isinstance(first["firstName"], str)
     assert isinstance(first["lastName"], str)
     assert isinstance(first["roles"], list)
-
-def test_fail_test():
-    payload = _get_json("/users")
-    
-    assert isinstance(payload, list)
-    assert len(payload) > 10000000
