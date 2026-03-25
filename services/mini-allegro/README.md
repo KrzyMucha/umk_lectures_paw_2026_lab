@@ -139,6 +139,18 @@ Domyślnie testy strzelają pod `http://localhost:8080`. Możesz zmienić URL:
 APP_BASE_URL=https://twoj-serwis.run.app pytest
 ```
 
+### GitHub Actions + GCP (Cloud Run)
+
+Workflow CI uruchamia:
+
+- testy lokalne na `docker compose` (zawsze),
+- testy pod wdrożony URL z GCP (opcjonalnie).
+
+Aby uruchamiać testy pod Cloud Run w GitHub Actions, ustaw w repo:
+
+- `Settings -> Secrets and variables -> Actions -> Variables`
+- zmienną `GCP_APP_BASE_URL`, np. `https://mini-allegro-xxxxx-ew.a.run.app`
+
 ---
 
 ## Kolejność operacji

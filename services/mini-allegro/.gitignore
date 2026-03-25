@@ -17,4 +17,5 @@
 ###< symfony/framework-bundle ###
 
 /.venv
-/.pytest_cache
+**/.pytest_cache
+**/__pycache__
