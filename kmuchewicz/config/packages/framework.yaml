@@ -1,7 +1,0 @@
-framework:
-    secret: '%env(APP_SECRET)%'
-    http_method_override: true
-
-when@test:
-    framework:
-        test: true
