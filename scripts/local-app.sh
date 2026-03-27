@@ -46,12 +46,42 @@ ensure_paths() {
   fi
 }
 
+<<<<<<< HEAD
+=======
+ensure_port_free() {
+  local port="${1:-8080}"
+
+  if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Port $port is already in use. Cannot start app." >&2
+    echo >&2
+    echo "Listening processes on port $port:" >&2
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN >&2 || true
+    echo >&2
+
+    local docker_using_port
+    docker_using_port="$(docker ps --filter publish="$port" --format 'table {{.ID}}\t{{.Names}}\t{{.Ports}}')"
+    if [[ "$(echo "$docker_using_port" | wc -l | tr -d ' ')" -gt 1 ]]; then
+      echo "Docker containers publishing port $port:" >&2
+      echo "$docker_using_port" >&2
+      echo >&2
+    fi
+
+    echo "Free the port and try again (example: docker stop <container_id> or kill <pid>)." >&2
+    exit 1
+  fi
+}
+
+>>>>>>> dca59cf (refactoring - running scripts)
 cmd="${1:-help}"
 
 ensure_paths
 
 case "$cmd" in
   up)
+<<<<<<< HEAD
+=======
+    ensure_port_free 8080
+>>>>>>> dca59cf (refactoring - running scripts)
     run_compose up --build --no-deps app
     ;;
   down)
@@ -59,6 +89,10 @@ case "$cmd" in
     ;;
   restart)
     run_compose down -v
+<<<<<<< HEAD
+=======
+    ensure_port_free 8080
+>>>>>>> dca59cf (refactoring - running scripts)
     run_compose up --build --no-deps app
     ;;
   logs)
