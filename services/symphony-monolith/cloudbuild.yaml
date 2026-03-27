@@ -1,0 +1,33 @@
+substitutions:
+  _REGION: europe-central2
+  _REGISTRY: europe-central2-docker.pkg.dev
+  _REPO: mini-allegro
+  _SERVICE: mini-allegro
+
+steps:
+  # Tworzymy builder i budujemy w JEDNYM kroku – każdy step to osobny kontener
+  # więc builder stworzony w poprzednim kroku nie byłby widoczny w kolejnym.
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        docker buildx create --name=builder --driver=docker-container --use && \
+        docker buildx build \
+          --file docker/Dockerfile \
+          --platform=linux/amd64 \
+          --target=prod \
+          --cache-from=type=registry,ref=$_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:cache \
+          --cache-to=type=registry,ref=$_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:cache,mode=max \
+          -t $_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:latest \
+          -t $_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA \
+          --push \
+          .
+
+images:
+  - $_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:latest
+  - $_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA
+
+options:
+  machineType: E2_HIGHCPU_8   # Szybszy niż domyślny E2; więcej CPU = szybsze kompilacje PHP i warstwy
+  logging: CLOUD_LOGGING_ONLY
