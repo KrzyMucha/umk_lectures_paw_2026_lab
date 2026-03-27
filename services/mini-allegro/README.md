@@ -35,15 +35,34 @@ terraform apply -var="alert_email=twoj.email@domena.pl"
 
 ## 3. Build i push obrazu Docker
 
+### Opcja A – Google Cloud Build (zalecane, najszybsze)
+
+Build działa natywnie na `linux/amd64` w GCP, blisko Artifact Registry. Cache warstw jest przechowywany w rejestrze między buildami (`mode=max` cachuje wszystkie etapy, w tym `base` z rozszerzeniami PHP).
+
 ```bash
 cd services/mini-allegro
 
-docker buildx build --platform linux/amd64 --target prod \
-  -t europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
-  --push .
+gcloud builds submit \
+  --config=cloudbuild.yaml \
+  --project=project-f5f4f6f0-acae-485b-a16 \
+  .
 ```
 
-> Na Apple Silicon (ARM) flaga `--platform linux/amd64` jest wymagana.
+### Opcja B – lokalny docker buildx z cache w rejestrze
+
+Używa tego samego cache z Artifact Registry co Cloud Build. Na Apple Silicon wymagana flaga `--platform linux/amd64`.
+
+```bash
+cd services/mini-allegro
+
+REGISTRY=europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro
+
+docker buildx build --platform linux/amd64 --target prod \
+  --cache-from type=registry,ref=${REGISTRY}:cache \
+  --cache-to   type=registry,ref=${REGISTRY}:cache,mode=max \
+  -t ${REGISTRY}:latest \
+  --push .
+```
 
 ---
 

@@ -68,6 +68,16 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
   }
 }
 
+# Cloud Build service account musi mieć prawo pushować obrazy do Artifact Registry
+data "google_project" "project" {}
+
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
+  location   = google_artifact_registry_repository.mini_allegro.location
+  repository = google_artifact_registry_repository.mini_allegro.repository_id
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
+
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
   location = google_cloud_run_v2_service.mini_allegro.location
   name     = google_cloud_run_v2_service.mini_allegro.name
