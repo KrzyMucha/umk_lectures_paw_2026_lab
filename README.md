@@ -26,7 +26,7 @@ gcloud auth configure-docker europe-central2-docker.pkg.dev
 ## 2. Terraform - utwórz infrastrukturę
 
 ```bash
-cd ../../infra
+cd infra
 terraform init
 terraform apply -var="alert_email=twoj.email@domena.pl"
 ```
@@ -69,7 +69,7 @@ docker buildx build --platform linux/amd64 --target prod \
 ## 4. Deploy Cloud Run
 
 ```bash
-cd ../../infra
+cd infra
 terraform apply -var="alert_email=twoj.email@domena.pl"
 ```
 
@@ -133,14 +133,24 @@ done
 
 ## Testy (Python, bez PHPUnit)
 
-Testy API są w katalogu [integ-tests/test_api.py](../../integ-tests/test_api.py) i używają `pytest`.
+Testy API są w katalogu [integ-tests/test_api.py](integ-tests/test_api.py) i używają `pytest`.
 
 ### Uruchomienie lokalne
+
+Możesz użyć skrótu przez skrypt pomocniczy:
+
+```bash
+./scripts/local-app.sh up
+./scripts/local-app.sh status
+./scripts/local-app.sh logs
+./scripts/local-app.sh test
+./scripts/local-app.sh down
+```
 
 1. Uruchom aplikację (np. przez Docker Compose):
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml up -d --build
+docker compose -f services/symphony-monolith/docker/docker-compose.yml -f services/symphony-monolith/docker/compose.override.yaml up -d --build --no-deps app
 ```
 
 2. Zainstaluj zależności testowe i uruchom testy:
@@ -148,14 +158,14 @@ docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml up -
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements-dev.txt
-pytest
+pip install -r services/symphony-monolith/requirements-dev.txt
+pytest integ-tests
 ```
 
 Domyślnie testy strzelają pod `http://localhost:8080`. Możesz zmienić URL:
 
 ```bash
-APP_BASE_URL=https://twoj-serwis.run.app pytest
+APP_BASE_URL=https://twoj-serwis.run.app pytest integ-tests
 ```
 
 ### GitHub Actions + GCP (Cloud Run)
@@ -188,7 +198,7 @@ gcloud run deploy mini-allegro \
 
 ## Deploy PROD z automatycznym rollbackiem
 
-W repo jest gotowy skrypt: `scripts/deploy_prod_with_rollback.sh`.
+W repo jest gotowy skrypt: `services/symphony-monolith/scripts/deploy_prod_with_rollback.sh`.
 
 Co robi:
 
@@ -201,9 +211,9 @@ Co robi:
 Użycie:
 
 ```bash
-chmod +x scripts/deploy_prod_with_rollback.sh
+chmod +x services/symphony-monolith/scripts/deploy_prod_with_rollback.sh
 
-./scripts/deploy_prod_with_rollback.sh \
+./services/symphony-monolith/scripts/deploy_prod_with_rollback.sh \
   --service mini-allegro \
   --region europe-central2 \
   --project project-f5f4f6f0-acae-485b-a16 \
@@ -213,7 +223,7 @@ chmod +x scripts/deploy_prod_with_rollback.sh
 Opcjonalnie możesz zmienić endpoint healthcheck i retry:
 
 ```bash
-./scripts/deploy_prod_with_rollback.sh \
+./services/symphony-monolith/scripts/deploy_prod_with_rollback.sh \
   --service mini-allegro \
   --region europe-central2 \
   --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
