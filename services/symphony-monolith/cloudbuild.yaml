@@ -14,6 +14,7 @@ steps:
       - |
         docker buildx create --name=builder --driver=docker-container --use && \
         docker buildx build \
+          --file docker/Dockerfile \
           --platform=linux/amd64 \
           --target=prod \
           --cache-from=type=registry,ref=$_REGISTRY/$PROJECT_ID/$_REPO/$_SERVICE:cache \

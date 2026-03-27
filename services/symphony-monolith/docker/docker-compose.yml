@@ -1,7 +1,8 @@
 services:
   app:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: dev
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health > /dev/null || exit 1"]
@@ -12,7 +13,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - .:/app
+      - ..:/app
       - vendor:/app/vendor
     environment:
       APP_ENV: dev

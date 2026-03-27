@@ -10,14 +10,11 @@
 /vendor/
 
 # Docker files
-docker-compose*.yml
-compose.override.yaml
-Dockerfile
+docker/*.yml
 
 # Python test env
 /.venv
 /.pytest_cache
-/tests_python/
 __pycache__/
 
 # Infra

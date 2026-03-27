@@ -24,20 +24,25 @@ jobs:
           python-version: "3.11"
 
       - name: Install test dependencies
+        working-directory: services/symphony-monolith
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
       - name: Build and start application stack
-        run: docker compose up -d --build
+        working-directory: services/symphony-monolith
+        run: docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml up -d --build
 
       - name: Install PHP dependencies inside app container
-        run: docker compose exec -T app composer install --no-interaction --prefer-dist
+        working-directory: services/symphony-monolith
+        run: docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml exec -T app composer install --no-interaction --prefer-dist
 
       - name: Verify Symfony runtime autoloader
-        run: test -f vendor/autoload_runtime.php
+        working-directory: services/symphony-monolith
+        run: docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml exec -T app test -f vendor/autoload_runtime.php
 
       - name: Wait for health endpoint
+        working-directory: services/symphony-monolith
         run: |
           for i in {1..30}; do
             if curl -fsS http://localhost:8080/health > /dev/null; then
@@ -48,21 +53,24 @@ jobs:
             sleep 5
           done
           echo "Application did not become healthy in time"
-          docker compose logs
+          docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml logs
           exit 1
 
       - name: Run Python API tests
+        working-directory: services/symphony-monolith
         env:
           APP_BASE_URL: http://localhost:8080
-        run: pytest
+        run: pytest ../../integ-tests
 
       - name: Show container logs on failure
         if: failure()
-        run: docker compose logs
+        working-directory: services/symphony-monolith
+        run: docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml logs
 
       - name: Stop application stack
         if: always()
-        run: docker compose down -v
+        working-directory: services/symphony-monolith
+        run: docker compose -f docker/docker-compose.yml -f docker/compose.override.yaml down -v
 
   python-api-tests-gcp:
     name: Python API tests (GCP URL)
@@ -83,6 +91,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install test dependencies
+        working-directory: services/symphony-monolith
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
@@ -102,4 +111,5 @@ jobs:
           exit 1
 
       - name: Run Python API tests against deployed URL
-        run: pytest
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests
