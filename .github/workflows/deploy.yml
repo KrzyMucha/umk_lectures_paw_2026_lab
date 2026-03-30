@@ -1,14 +1,17 @@
-name: Build & Deploy mini-allegro
+name: Deploy DEV
 
 on:
   push:
     branches:
       - develop
-      - main
     paths:
       - "services/symphony-monolith/**"
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
+      - ".github/workflows/deploy-prod.yml"
+
+permissions:
+  contents: write
 
 env:
   PROJECT_ID: project-f5f4f6f0-acae-485b-a16
@@ -17,11 +20,10 @@ env:
   REPOSITORY: mini-allegro
   IMAGE: mini-allegro
   SERVICE_DEV: mini-allegro-dev
-  SERVICE_PROD: mini-allegro-prod
 
 jobs:
-  build:
-    name: Build & Push Docker image
+  build-dev:
+    name: Build & Push Docker image (DEV tag)
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -38,10 +40,10 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
 
-      - name: Generate image tag
+      - name: Generate DEV image tag
         id: meta
         run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}"
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}-dev"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -60,10 +62,9 @@ jobs:
 
   deploy-dev:
     name: Deploy to DEV
-    needs: build
+    needs: build-dev
     runs-on: ubuntu-latest
     environment: dev
-    if: github.ref == 'refs/heads/develop'
 
     steps:
       - name: Authenticate to GCP
@@ -76,16 +77,28 @@ jobs:
         with:
           service: ${{ env.SERVICE_DEV }}
           region: ${{ env.REGION }}
-          image: ${{ needs.build.outputs.image_tag }}
+          image: ${{ needs.build-dev.outputs.image_tag }}
           env_vars: |
             APP_ENV=dev
             DATABASE_URL=${{ secrets.DEV_DATABASE_URL }}
+
+      - name: DEV health-check (HTTP 200)
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_DEV }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
+          echo "DEV URL: $URL"
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed! Got HTTP $STATUS"
+            exit 1
+          fi
 
   integration-tests-dev:
     name: Integration tests (DEV)
     needs: deploy-dev
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
 
     steps:
       - name: Checkout code
@@ -133,77 +146,23 @@ jobs:
         working-directory: services/symphony-monolith
         run: pytest ../../integ-tests
 
-  deploy-prod:
-    name: Deploy to PROD
-    needs: build
+  promote-to-main:
+    name: Auto-merge develop -> main
+    needs: integration-tests-dev
     runs-on: ubuntu-latest
-    environment: prod
-    if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Deploy to Cloud Run PROD
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE_PROD }}
-          region: ${{ env.REGION }}
-          image: ${{ needs.build.outputs.image_tag }}
-          env_vars: |
-            APP_ENV=prod
-            DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}
-
-  integration-tests-prod:
-    name: Integration tests (PROD)
-    needs: deploy-prod
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          fetch-depth: 0
 
-      - name: Install test dependencies
-        working-directory: services/symphony-monolith
+      - name: Merge develop into main and push
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Resolve PROD URL
-        run: |
-          URL=$(gcloud run services describe ${{ env.SERVICE_PROD }} \
-            --region=${{ env.REGION }} \
-            --format='value(status.url)')
-          echo "APP_BASE_URL=$URL" >> $GITHUB_ENV
-          echo "Using PROD URL: $URL"
-
-      - name: Wait for PROD health endpoint
-        run: |
-          HEALTH_URL="${APP_BASE_URL%/}/health"
-          for i in {1..30}; do
-            if curl -fsS "$HEALTH_URL" > /dev/null; then
-              echo "Application is healthy: $HEALTH_URL"
-              exit 0
-            fi
-            echo "Waiting for deployed app... ($i/30)"
-            sleep 10
-          done
-          echo "Application did not become healthy in time: $HEALTH_URL"
-          exit 1
-
-      - name: Run integration tests against PROD
-        working-directory: services/symphony-monolith
-        run: pytest ../../integ-tests
+          git fetch origin main develop
+          git checkout -B main origin/main
+          git merge --no-ff --no-edit origin/develop
+          git push origin main
