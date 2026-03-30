@@ -20,11 +20,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build production image
-        working-directory: services/symphony-monolith
-        run: |
-          docker build \
-            --file docker/Dockerfile \
-            --target prod \
-            --tag mini-allegro:ci \
-            .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production image (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: services/symphony-monolith
+          file: services/symphony-monolith/docker/Dockerfile
+          target: prod
+          push: false
+          tags: mini-allegro:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
