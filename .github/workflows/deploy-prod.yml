@@ -9,6 +9,11 @@ on:
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
+  workflow_run:
+    workflows:
+      - Deploy DEV
+    types:
+      - completed
   workflow_dispatch:
 
 env:
@@ -22,6 +27,7 @@ env:
 jobs:
   build-prod:
     name: Build & Push Docker image (PROD tag)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -29,6 +35,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Resolve source SHA (main)
+        id: source
+        run: |
+          SOURCE_SHA=$(git rev-parse HEAD)
+          echo "sha=${SOURCE_SHA}" >> $GITHUB_OUTPUT
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
@@ -41,7 +55,7 @@ jobs:
       - name: Generate PROD image tag
         id: meta
         run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}-prod"
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ steps.source.outputs.sha }}-prod"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -60,6 +74,7 @@ jobs:
 
   deploy-prod:
     name: Deploy to PROD
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     needs: build-prod
     runs-on: ubuntu-latest
     environment: prod
@@ -95,6 +110,7 @@ jobs:
 
   integration-tests-prod:
     name: Integration tests (PROD)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     needs: deploy-prod
     runs-on: ubuntu-latest
 
