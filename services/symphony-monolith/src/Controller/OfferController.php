@@ -24,7 +24,7 @@ class OfferController extends AbstractController
         $offers = [
             new Offer('iPhone 15', 'Nowy, zafoliowany', 4999.99),
             new Offer('MacBook Pro', '16 cali, M3', 12999.99),
-            new Offer('Another offer', '16 cali, M3', 12999.99),
+            new Offer('Another offer one more change - march 30, testing', '16 cali, M3', 12999.99),
         ];
 
         $responsePayload = array_map(fn(Offer $offer) => $offer->toArray(), $offers);
