@@ -15,7 +15,9 @@ ENV APP_ENV=dev
 COPY composer.json composer.lock* ./
 RUN composer install --no-scripts
 
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "public"]
+COPY . .
+
+CMD ["sh", "-c", "php bin/console doctrine:migrations:migrate --no-interaction && php -S 0.0.0.0:8080 -t public"]
 
 # --- prod stage ---
 FROM base AS prod
@@ -38,4 +40,4 @@ RUN --mount=type=cache,target=/root/.composer/cache \
 
 EXPOSE 8080
 
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "public"]
+CMD ["sh", "-c", "php bin/console doctrine:migrations:migrate --no-interaction && php -S 0.0.0.0:8080 -t public"]

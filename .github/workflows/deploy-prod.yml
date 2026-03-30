@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "infra/prod/**"
       - "services/symphony-monolith/**"
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
@@ -25,9 +26,47 @@ env:
   SERVICE_PROD: mini-allegro-prod
 
 jobs:
+  terraform-prod:
+    name: Terraform apply (PROD infra)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Ensure Terraform state bucket exists
+        run: |
+          gcloud storage buckets describe gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} >/dev/null 2>&1 || \
+          gcloud storage buckets create gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} --location=${{ env.REGION }}
+
+      - name: Terraform init (remote state)
+        working-directory: infra/prod
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=mini-allegro/prod"
+
+      - name: Terraform apply (PROD)
+        working-directory: infra/prod
+        run: terraform apply -input=false -auto-approve
+
   build-prod:
     name: Build & Push Docker image (PROD tag)
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    needs: terraform-prod
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -156,6 +195,14 @@ jobs:
           echo "Application did not become healthy in time: $HEALTH_URL"
           exit 1
 
-      - name: Run integration tests against PROD
+      - name: Integration tests - offers (PROD)
         working-directory: services/symphony-monolith
-        run: pytest ../../integ-tests
+        run: pytest ../../integ-tests/test_offers.py
+
+      - name: Integration tests - users (PROD)
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests/test_users.py
+
+      - name: Integration tests - products (PROD)
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests/test_products.py

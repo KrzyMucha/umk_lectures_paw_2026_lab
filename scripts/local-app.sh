@@ -46,8 +46,6 @@ ensure_paths() {
   fi
 }
 
-<<<<<<< HEAD
-=======
 ensure_port_free() {
   local port="${1:-8080}"
 
@@ -71,17 +69,38 @@ ensure_port_free() {
   fi
 }
 
->>>>>>> dca59cf (refactoring - running scripts)
+resolve_dev_database_url() {
+  if [[ -n "${DATABASE_URL:-}" ]]; then
+    return
+  fi
+
+  if ! command -v terraform >/dev/null 2>&1; then
+    echo "DATABASE_URL is not set and terraform is not installed." >&2
+    echo "Set DATABASE_URL manually or install terraform and run infra apply first." >&2
+    exit 1
+  fi
+
+  local tf_output
+  tf_output="$(terraform -chdir="$ROOT_DIR/infra/dev" output -raw database_url 2>/dev/null || true)"
+
+  if [[ -z "$tf_output" ]]; then
+    echo "DATABASE_URL is not set and terraform output database_url (infra/dev) is unavailable." >&2
+    echo "Run terraform apply in infra or export DATABASE_URL manually." >&2
+    exit 1
+  fi
+
+  export DATABASE_URL="$tf_output"
+  echo "Using DATABASE_URL from terraform output: infra/dev.database_url"
+}
+
 cmd="${1:-help}"
 
 ensure_paths
 
 case "$cmd" in
   up)
-<<<<<<< HEAD
-=======
     ensure_port_free 8080
->>>>>>> dca59cf (refactoring - running scripts)
+    resolve_dev_database_url
     run_compose up --build --no-deps app
     ;;
   down)
@@ -89,10 +108,8 @@ case "$cmd" in
     ;;
   restart)
     run_compose down -v
-<<<<<<< HEAD
-=======
     ensure_port_free 8080
->>>>>>> dca59cf (refactoring - running scripts)
+    resolve_dev_database_url
     run_compose up --build --no-deps app
     ;;
   logs)
