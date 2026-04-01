@@ -37,6 +37,7 @@ jobs:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
           PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
           missing=0
 
@@ -52,6 +53,16 @@ jobs:
 
           if [ -z "$PROD_DATABASE_URL" ]; then
             echo "Missing required secret: PROD_DATABASE_URL"
+            missing=1
+          fi
+
+          if [ -z "$APP_SECRET" ]; then
+            echo "Missing required secret: APP_SECRET"
+            missing=1
+          fi
+
+          if printf '%s' "$PROD_DATABASE_URL" | grep -Eq '(^|[?&])serverVersion=([&]|$)'; then
+            echo "Invalid PROD_DATABASE_URL: serverVersion is empty"
             missing=1
           fi
 
@@ -153,6 +164,22 @@ jobs:
     environment: prod
 
     steps:
+      - name: Prepare sanitized DATABASE_URL
+        id: dburl
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          DB_URL="$PROD_DATABASE_URL"
+          DB_URL="$(printf '%s' "$DB_URL" | sed -E 's/([?&])serverVersion=[^&]*(&|$)/\1\2/g; s/\?&/\?/g; s/&&+/&/g; s/[?&]$//')"
+
+          if [ -z "$DB_URL" ]; then
+            echo "Sanitized DATABASE_URL is empty"
+            exit 1
+          fi
+
+          echo "::add-mask::$DB_URL"
+          echo "value=$DB_URL" >> "$GITHUB_OUTPUT"
+
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
@@ -166,7 +193,8 @@ jobs:
           image: ${{ needs.build-prod.outputs.image_tag }}
           env_vars: |
             APP_ENV=prod
-            DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}
+            DATABASE_URL=${{ steps.dburl.outputs.value }}
+            APP_SECRET=${{ secrets.APP_SECRET }}
 
       - name: PROD health-check (HTTP 200)
         run: |

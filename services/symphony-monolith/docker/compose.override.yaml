@@ -1,2 +1,4 @@
 services:
-  app: {}
+  app:
+    environment:
+      APP_SECRET: "de7af9309aaba9542fe4fe4de71c4f82"

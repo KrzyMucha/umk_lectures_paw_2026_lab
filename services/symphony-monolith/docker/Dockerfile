@@ -29,6 +29,7 @@ RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
             "opcache.enable=1" \
             "opcache.memory_consumption=128" \
             "opcache.max_accelerated_files=10000" \
+            "variables_order=EGPCS" \
         > "$PHP_INI_DIR/conf.d/opcache.ini"
 
 COPY composer.json composer.lock* ./
@@ -42,4 +43,4 @@ RUN --mount=type=cache,target=/root/.composer/cache \
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "php bin/console doctrine:migrations:migrate --no-interaction && php -S 0.0.0.0:8080 -t public"]
+CMD ["sh", "-c", "php bin/console doctrine:migrations:migrate --no-interaction && php -S 0.0.0.0:${PORT:-8080} -t public"]
