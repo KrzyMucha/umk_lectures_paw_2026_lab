@@ -251,6 +251,10 @@ jobs:
         working-directory: services/symphony-monolith
         run: pytest ../../integ-tests/test_products.py
 
+      - name: Integration tests - product reviews (DEV)
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests/test_product_reviews.py
+
   promote-to-main:
     name: Auto-merge develop -> main
     needs: integration-tests-dev

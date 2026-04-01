@@ -268,3 +268,7 @@ jobs:
       - name: Integration tests - products (PROD)
         working-directory: services/symphony-monolith
         run: pytest ../../integ-tests/test_products.py
+
+      - name: Integration tests - product reviews (PROD)
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests/test_product_reviews.py
