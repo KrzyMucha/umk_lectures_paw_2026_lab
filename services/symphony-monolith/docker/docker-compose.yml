@@ -1,11 +1,32 @@
 services:
+  db:
+    image: postgres:16-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   app:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: dev
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health > /dev/null || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/health > /dev/null || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,3 +42,4 @@ services:
 
 volumes:
   vendor:
+  postgres_data:
