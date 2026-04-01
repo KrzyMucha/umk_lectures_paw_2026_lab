@@ -145,11 +145,14 @@ Możesz użyć skrótu przez skrypt pomocniczy:
 
 ```bash
 ./scripts/local-app.sh up
+./scripts/local-app.sh stop
 ./scripts/local-app.sh status
 ./scripts/local-app.sh logs
 ./scripts/local-app.sh test
 ./scripts/local-app.sh down
 ```
+
+Jeśli `./scripts/local-app.sh up` wykryje, że port `8080` jest zajęty przez już działającą usługę `app` z Docker Compose, nie kończy się błędem — przełącza się w tryb „reuse” i tylko podpina logi.
 
 1. Uruchom aplikację (np. przez Docker Compose):
 

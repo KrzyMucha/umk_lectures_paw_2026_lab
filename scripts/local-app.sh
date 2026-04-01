@@ -16,6 +16,7 @@ Usage:
 
 Commands:
   up         Build/start app; if already running, reuse and stream logs
+  stop       Stop app container (without removing volumes)
   down       Stop stack and remove volumes
   restart    Recreate app container and stream logs (Ctrl+C stops app)
   logs       Show docker compose logs (follow mode)
@@ -25,13 +26,15 @@ Commands:
 
 Examples:
   ./scripts/local-app.sh up
+  ./scripts/local-app.sh stop
   ./scripts/local-app.sh logs
   ./scripts/local-app.sh test
 EOF
 }
 
 run_compose() {
-  docker compose "${COMPOSE_FILES[@]}" "$@"
+  local compose_database_url="${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder}"
+  DATABASE_URL="$compose_database_url" docker compose "${COMPOSE_FILES[@]}" "$@"
 }
 
 is_app_running() {
@@ -113,6 +116,9 @@ case "$cmd" in
     ensure_port_free 8080
     resolve_dev_database_url
     run_compose up --build --no-deps app
+    ;;
+  stop)
+    run_compose stop app
     ;;
   down)
     run_compose down -v
