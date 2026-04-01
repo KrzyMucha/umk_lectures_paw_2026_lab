@@ -43,7 +43,7 @@ class Offer
     public function toArray(): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->id ?? 0,
             'title' => $this->title,
             'description' => $this->description,
             'price' => $this->price,

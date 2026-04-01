@@ -36,7 +36,7 @@ class Product
     public function toArray(): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->id ?? 0,
             'name' => $this->name,
             'description' => $this->description,
             'price' => (float) $this->price,

@@ -64,7 +64,7 @@ class Purchase
     public function toArray(): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->id ?? 0,
             'userId' => $this->userId,
             'offerId' => $this->offerId,
             'quantity' => $this->quantity,
