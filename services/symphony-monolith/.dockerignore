@@ -20,7 +20,8 @@ __pycache__/
 # Infra
 /infra/
 
-# Local env overrides
+# Env files – only local overrides are excluded; .env must stay in image (Symfony PathException)
+# Runtime env vars from Cloud Run take precedence when variables_order includes E in php.ini
 .env.local
 .env.local.php
 .env.*.local

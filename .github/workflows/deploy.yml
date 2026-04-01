@@ -5,6 +5,7 @@ on:
     branches:
       - develop
     paths:
+      - "infra/dev/**"
       - "services/symphony-monolith/**"
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
@@ -22,8 +23,87 @@ env:
   SERVICE_DEV: mini-allegro-dev
 
 jobs:
+  validate-secrets:
+    name: Validate required secrets (DEV)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate required secrets are set
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+        run: |
+          missing=0
+
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "Missing required secret: GCP_SA_KEY"
+            missing=1
+          fi
+
+          if [ -z "$TF_STATE_BUCKET" ]; then
+            echo "Missing required secret: TF_STATE_BUCKET"
+            missing=1
+          fi
+
+          if [ -z "$DEV_DATABASE_URL" ]; then
+            echo "Missing required secret: DEV_DATABASE_URL"
+            missing=1
+          fi
+
+          if [ -z "$APP_SECRET" ]; then
+            echo "Missing required secret: APP_SECRET"
+            missing=1
+          fi
+
+          if printf '%s' "$DEV_DATABASE_URL" | grep -Eq '(^|[?&])serverVersion=([&]|$)'; then
+            echo "Invalid DEV_DATABASE_URL: serverVersion is empty"
+            missing=1
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+  terraform-dev:
+    name: Terraform apply (DEV infra)
+    needs: validate-secrets
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Ensure Terraform state bucket exists
+        run: |
+          gcloud storage buckets describe gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} >/dev/null 2>&1 || \
+          gcloud storage buckets create gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} --location=${{ env.REGION }}
+
+      - name: Terraform init (remote state)
+        working-directory: infra/dev
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=mini-allegro/dev"
+
+      - name: Terraform apply (DEV)
+        working-directory: infra/dev
+        run: terraform apply -input=false -auto-approve
+
   build-dev:
     name: Build & Push Docker image (DEV tag)
+    needs: terraform-dev
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -67,6 +147,22 @@ jobs:
     environment: dev
 
     steps:
+      - name: Prepare sanitized DATABASE_URL
+        id: dburl
+        env:
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          DB_URL="$DEV_DATABASE_URL"
+          DB_URL="$(printf '%s' "$DB_URL" | sed -E 's/([?&])serverVersion=[^&]*(&|$)/\1\2/g; s/\?&/\?/g; s/&&+/&/g; s/[?&]$//')"
+
+          if [ -z "$DB_URL" ]; then
+            echo "Sanitized DATABASE_URL is empty"
+            exit 1
+          fi
+
+          echo "::add-mask::$DB_URL"
+          echo "value=$DB_URL" >> "$GITHUB_OUTPUT"
+
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
@@ -80,7 +176,8 @@ jobs:
           image: ${{ needs.build-dev.outputs.image_tag }}
           env_vars: |
             APP_ENV=dev
-            DATABASE_URL=${{ secrets.DEV_DATABASE_URL }}
+            DATABASE_URL=${{ steps.dburl.outputs.value }}
+            APP_SECRET=${{ secrets.APP_SECRET }}
 
       - name: DEV health-check (HTTP 200)
         run: |
@@ -142,9 +239,17 @@ jobs:
           echo "Application did not become healthy in time: $HEALTH_URL"
           exit 1
 
-      - name: Run integration tests against DEV
+      - name: Integration tests - offers (DEV)
         working-directory: services/symphony-monolith
-        run: pytest ../../integ-tests
+        run: pytest ../../integ-tests/test_offers.py
+
+      - name: Integration tests - users (DEV)
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests/test_users.py
+
+      - name: Integration tests - products (DEV)
+        working-directory: services/symphony-monolith
+        run: pytest ../../integ-tests/test_products.py
 
   promote-to-main:
     name: Auto-merge develop -> main

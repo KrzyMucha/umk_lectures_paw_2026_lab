@@ -3,8 +3,6 @@
 namespace App\Entity;
 
 use App\Repository\ProductRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
@@ -24,14 +22,6 @@ class Product
     #[ORM\Column(type: 'float')]
     private float $price;
 
-    #[ORM\OneToMany(mappedBy: 'product', targetEntity: ProductReview::class, cascade: ['persist', 'remove'])]
-    private Collection $reviews;
-
-    public function __construct()
-    {
-        $this->reviews = new ArrayCollection();
-    }
-
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -42,17 +32,6 @@ class Product
 
     public function getPrice(): float { return $this->price; }
     public function setPrice(float $price): self { $this->price = $price; return $this; }
-
-    public function getReviews(): Collection { return $this->reviews; }
-
-    public function addReview(ProductReview $review): self
-    {
-        if (!$this->reviews->contains($review)) {
-            $this->reviews->add($review);
-            $review->setProduct($this);
-        }
-        return $this;
-    }
 
     public function toArray(): array
     {

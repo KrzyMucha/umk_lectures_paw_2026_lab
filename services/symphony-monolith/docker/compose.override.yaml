@@ -1,7 +1,4 @@
-
 services:
-###> doctrine/doctrine-bundle ###
-  database:
-    ports:
-      - "5432"
-###< doctrine/doctrine-bundle ###
+  app:
+    environment:
+      APP_SECRET: "de7af9309aaba9542fe4fe4de71c4f82"

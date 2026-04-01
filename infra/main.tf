@@ -5,12 +5,88 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
 provider "google" {
   project = var.project
   region  = var.region
+}
+
+resource "random_password" "db_dev_password" {
+  length  = 24
+  special = false
+}
+
+resource "random_password" "db_prod_password" {
+  length  = 24
+  special = false
+}
+
+resource "google_sql_database_instance" "dev" {
+  name                = var.db_dev_instance_name
+  region              = var.region
+  database_version    = "POSTGRES_15"
+  deletion_protection = false
+
+  settings {
+    tier = "db-custom-1-3840"
+
+    ip_configuration {
+      ipv4_enabled = true
+
+      authorized_networks {
+        name  = "open-for-labs"
+        value = "0.0.0.0/0"
+      }
+    }
+  }
+}
+
+resource "google_sql_database_instance" "prod" {
+  name                = var.db_prod_instance_name
+  region              = var.region
+  database_version    = "POSTGRES_15"
+  deletion_protection = false
+
+  settings {
+    tier = "db-custom-1-3840"
+
+    ip_configuration {
+      ipv4_enabled = true
+
+      authorized_networks {
+        name  = "open-for-labs"
+        value = "0.0.0.0/0"
+      }
+    }
+  }
+}
+
+resource "google_sql_database" "dev" {
+  name     = var.db_dev_name
+  instance = google_sql_database_instance.dev.name
+}
+
+resource "google_sql_database" "prod" {
+  name     = var.db_prod_name
+  instance = google_sql_database_instance.prod.name
+}
+
+resource "google_sql_user" "dev" {
+  name     = var.db_username
+  instance = google_sql_database_instance.dev.name
+  password = random_password.db_dev_password.result
+}
+
+resource "google_sql_user" "prod" {
+  name     = var.db_username
+  instance = google_sql_database_instance.prod.name
+  password = random_password.db_prod_password.result
 }
 
 resource "google_artifact_registry_repository" "mini_allegro" {

@@ -133,7 +133,11 @@ done
 
 ## Testy (Python, bez PHPUnit)
 
-Testy API są w katalogu [integ-tests/test_api.py](integ-tests/test_api.py) i używają `pytest`.
+Testy API są rozdzielone per encja i używają `pytest`:
+
+- `integ-tests/test_offers.py`
+- `integ-tests/test_users.py`
+- `integ-tests/test_products.py`
 
 ### Uruchomienie lokalne
 
@@ -141,17 +145,23 @@ Możesz użyć skrótu przez skrypt pomocniczy:
 
 ```bash
 ./scripts/local-app.sh up
+./scripts/local-app.sh stop
 ./scripts/local-app.sh status
 ./scripts/local-app.sh logs
 ./scripts/local-app.sh test
 ./scripts/local-app.sh down
 ```
 
+Jeśli `./scripts/local-app.sh up` wykryje, że port `8080` jest zajęty przez już działającą usługę `app` z Docker Compose, nie kończy się błędem — przełącza się w tryb „reuse” i tylko podpina logi.
+
 1. Uruchom aplikację (np. przez Docker Compose):
 
 ```bash
-docker compose -f services/symphony-monolith/docker/docker-compose.yml -f services/symphony-monolith/docker/compose.override.yaml up -d --build --no-deps app
+terraform -chdir=infra/dev output -raw database_url
+./scripts/local-app.sh up
 ```
+
+`local-app.sh` automatycznie pobiera `DATABASE_URL` z `infra/dev` (`database_url`), więc lokalna instancja łączy się z bazą DEV w Cloud SQL.
 
 2. Zainstaluj zależności testowe i uruchom testy:
 
@@ -159,7 +169,9 @@ docker compose -f services/symphony-monolith/docker/docker-compose.yml -f servic
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r services/symphony-monolith/requirements-dev.txt
-pytest integ-tests
+pytest integ-tests/test_offers.py
+pytest integ-tests/test_users.py
+pytest integ-tests/test_products.py
 ```
 
 Domyślnie testy strzelają pod `http://localhost:8080`. Możesz zmienić URL:
@@ -170,15 +182,20 @@ APP_BASE_URL=https://twoj-serwis.run.app pytest integ-tests
 
 ### GitHub Actions + GCP (Cloud Run)
 
-Workflow CI uruchamia:
+Workflowy deploy uruchamiają testy integracyjne oddzielnie dla `offers`, `users` i `products`, dzięki czemu od razu widać, która encja failuje.
 
-- testy lokalne na `docker compose` (zawsze),
-- testy pod wdrożony URL z GCP (opcjonalnie).
+Wymagane sekrety GitHub Actions:
 
-Aby uruchamiać testy pod Cloud Run w GitHub Actions, ustaw w repo:
+- `DEV_DATABASE_URL`
+- `PROD_DATABASE_URL`
+- `TF_STATE_BUCKET` (nazwa bucketu GCS na terraform state, np. `mini-allegro-tf-state`)
 
-- `Settings -> Secrets and variables -> Actions -> Variables`
-- zmienną `GCP_APP_BASE_URL`, np. `https://mini-allegro-xxxxx-ew.a.run.app`
+Wartości możesz pobrać z Terraform:
+
+```bash
+terraform -chdir=infra/dev output -raw database_url
+terraform -chdir=infra/prod output -raw database_url
+```
 
 ---
 
