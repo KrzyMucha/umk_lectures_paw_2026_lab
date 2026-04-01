@@ -15,7 +15,7 @@ Usage:
   ./scripts/local-app.sh <command>
 
 Commands:
-  up         Build, start and stream app logs (Ctrl+C stops app)
+  up         Build/start app; if already running, reuse and stream logs
   down       Stop stack and remove volumes
   restart    Recreate app container and stream logs (Ctrl+C stops app)
   logs       Show docker compose logs (follow mode)
@@ -34,6 +34,10 @@ run_compose() {
   docker compose "${COMPOSE_FILES[@]}" "$@"
 }
 
+is_app_running() {
+  run_compose ps --status running --services 2>/dev/null | grep -qx 'app'
+}
+
 ensure_paths() {
   if [[ ! -d "$SERVICE_DIR" ]]; then
     echo "Service directory not found: $SERVICE_DIR" >&2
@@ -50,6 +54,13 @@ ensure_port_free() {
   local port="${1:-8080}"
 
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+    if is_app_running; then
+      echo "Port $port is already in use, but compose service 'app' is running. Reusing existing app."
+      echo "Attaching logs (Ctrl+C detaches, app keeps running)..."
+      run_compose logs -f app
+      exit 0
+    fi
+
     echo "Port $port is already in use. Cannot start app." >&2
     echo >&2
     echo "Listening processes on port $port:" >&2
