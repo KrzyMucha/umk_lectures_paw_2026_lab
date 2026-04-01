@@ -23,8 +23,41 @@ env:
   SERVICE_DEV: mini-allegro-dev
 
 jobs:
+  validate-secrets:
+    name: Validate required secrets (DEV)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate required secrets are set
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          missing=0
+
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "Missing required secret: GCP_SA_KEY"
+            missing=1
+          fi
+
+          if [ -z "$TF_STATE_BUCKET" ]; then
+            echo "Missing required secret: TF_STATE_BUCKET"
+            missing=1
+          fi
+
+          if [ -z "$DEV_DATABASE_URL" ]; then
+            echo "Missing required secret: DEV_DATABASE_URL"
+            missing=1
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
   terraform-dev:
     name: Terraform apply (DEV infra)
+    needs: validate-secrets
     runs-on: ubuntu-latest
     environment: dev
 

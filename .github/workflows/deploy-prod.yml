@@ -26,9 +26,43 @@ env:
   SERVICE_PROD: mini-allegro-prod
 
 jobs:
+  validate-secrets:
+    name: Validate required secrets (PROD)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate required secrets are set
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          missing=0
+
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "Missing required secret: GCP_SA_KEY"
+            missing=1
+          fi
+
+          if [ -z "$TF_STATE_BUCKET" ]; then
+            echo "Missing required secret: TF_STATE_BUCKET"
+            missing=1
+          fi
+
+          if [ -z "$PROD_DATABASE_URL" ]; then
+            echo "Missing required secret: PROD_DATABASE_URL"
+            missing=1
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
   terraform-prod:
     name: Terraform apply (PROD infra)
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    needs: validate-secrets
     runs-on: ubuntu-latest
     environment: prod
 
