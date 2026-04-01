@@ -47,9 +47,22 @@ Examples:
 }
 
 function Invoke-Compose {
-    $dbUrl = if ($env:DATABASE_URL) { $env:DATABASE_URL } else { "postgresql://placeholder:placeholder@localhost:5432/placeholder" }
-    $env:DATABASE_URL = $dbUrl
-    docker compose @COMPOSE_FILES @args
+    $hadDbUrl = Test-Path Env:DATABASE_URL
+    $previousDbUrl = $env:DATABASE_URL
+
+    if (-not $hadDbUrl) {
+        $env:DATABASE_URL = "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+    }
+
+    try {
+        docker compose @COMPOSE_FILES @args
+    } finally {
+        if ($hadDbUrl) {
+            $env:DATABASE_URL = $previousDbUrl
+        } else {
+            Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Test-AppRunning {
@@ -108,15 +121,32 @@ $TF_STATE_GCS = "gs://mini-allegro-tf-state/mini-allegro/dev/default.tfstate"
 $LOCAL_ENV_FILE = "$ROOT_DIR\.env.local"
 
 function Resolve-DevDatabaseUrl {
-    if ($env:DATABASE_URL) { return }
+    if ($env:DATABASE_URL -and ($env:DATABASE_URL -notmatch 'placeholder:placeholder@localhost:5432/placeholder')) {
+        return
+    }
 
     # 1. Try terraform (if installed)
-    if (Get-Command terraform -ErrorAction SilentlyContinue) {
-        $tfOutput = terraform -chdir="$ROOT_DIR\infra\dev" output -raw database_url 2>$null
-        if ($tfOutput) {
-            $env:DATABASE_URL = $tfOutput
-            Write-Host "Using DATABASE_URL from terraform output: infra/dev.database_url"
-            return
+    $tfDir = "$ROOT_DIR\infra\dev"
+    if ((Get-Command terraform -ErrorAction SilentlyContinue) -and (Test-Path $tfDir -PathType Container)) {
+        $prevNativeErrPref = $null
+        if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $prevNativeErrPref = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        try {
+            $tfOutput = (& terraform "-chdir=$tfDir" output -raw database_url 2>$null | Out-String).Trim()
+            if ($tfOutput) {
+                $env:DATABASE_URL = $tfOutput
+                Write-Host "Using DATABASE_URL from terraform output: infra/dev.database_url"
+                return
+            }
+        } catch {
+            Write-Host "Terraform output unavailable, trying next DATABASE_URL source..." -ForegroundColor Yellow
+        } finally {
+            if ($null -ne $prevNativeErrPref) {
+                $PSNativeCommandUseErrorActionPreference = $prevNativeErrPref
+            }
         }
     }
 
@@ -144,7 +174,14 @@ function Resolve-DevDatabaseUrl {
         exit 1
     }
 
-    $url = $stateJson | python -c "import sys,json; s=json.load(sys.stdin); print(s['outputs']['database_url']['value'])" 2>$null
+    try {
+        $state = $stateJson | ConvertFrom-Json
+        $url = $state.outputs.database_url.value
+    } catch {
+        Write-Error "Nie udalo sie sparsowac terraform state JSON."
+        exit 1
+    }
+
     if (-not $url) {
         Write-Error "Nie udalo sie odczytac database_url z terraform state."
         exit 1
