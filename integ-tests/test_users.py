@@ -1,3 +1,29 @@
+import uuid
+
+def test_users_post_creates_random_user():
+    token = uuid.uuid4().hex[:10]
+    email = f"integration.user.{token}@example.com"
+
+    created = request_json(
+        "/users",
+        method="POST",
+        payload={
+            "email": email,
+            "firstName": "Integration",
+            "lastName": f"User{token[:4]}",
+            "roles": ["ROLE_CUSTOMER"],
+        },
+        expected_status=201,
+    )
+
+    assert isinstance(created, dict)
+    assert isinstance(created.get("id"), int)
+    assert created["email"] == email
+    assert created["firstName"] == "Integration"
+    assert created["lastName"].startswith("User")
+    assert isinstance(created["roles"], list)
+    assert "ROLE_CUSTOMER" in created["roles"]
+
 from _api_client import request_json
 
 
