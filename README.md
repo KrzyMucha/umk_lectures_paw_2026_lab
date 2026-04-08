@@ -1,3 +1,4 @@
+#testing push 1
 # Mini Allegro - Infrastructure
 
 ## Wymagania

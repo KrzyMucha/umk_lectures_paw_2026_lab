@@ -22,6 +22,10 @@ class Offer
     #[ORM\Column(type: 'float')]
     private float $price;
 
+    #[ORM\ManyToOne(targetEntity: SuperSeller::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?SuperSeller $superSeller = null;
+
     public function __construct(string $title, string $description, float $price)
     {
         $this->title = $title;
@@ -40,6 +44,9 @@ class Offer
     public function getPrice(): float { return $this->price; }
     public function setPrice(float $price): self { $this->price = $price; return $this; }
 
+    public function getSuperSeller(): ?SuperSeller { return $this->superSeller; }
+    public function setSuperSeller(?SuperSeller $superSeller): self { $this->superSeller = $superSeller; return $this; }
+
     public function toArray(): array
     {
         return [
@@ -47,6 +54,7 @@ class Offer
             'title' => $this->title,
             'description' => $this->description,
             'price' => $this->price,
+            'superSellerId' => $this->superSeller?->getId(),
         ];
     }
 }
