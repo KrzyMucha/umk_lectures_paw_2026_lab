@@ -28,6 +28,9 @@ class Purchase
     #[ORM\Column(length: 32)]
     private string $status;
 
+    #[ORM\ManyToOne]
+    private ?SuperSeller $superSeller = null;
+
     public function __construct(
         int $userId,
         int $offerId,
@@ -58,6 +61,9 @@ class Purchase
 
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): self { $this->status = $status; return $this; }
+
+    public function getSuperSeller(): ?SuperSeller { return $this->superSeller; }
+    public function setSuperSeller(?SuperSeller $superSeller): self { $this->superSeller = $superSeller; return $this; }
 
     public function getTotalPrice(): float { return $this->quantity * $this->pricePerUnit; }
 
