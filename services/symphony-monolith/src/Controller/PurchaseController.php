@@ -12,7 +12,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/purchases')]
 class PurchaseController extends AbstractController
 {
     public function __construct(
@@ -20,8 +19,8 @@ class PurchaseController extends AbstractController
         private readonly PurchaseRepository $purchaseRepository,
     ) {}
 
-    #[Route('', methods: ['GET'])]
-    #[Route('/', methods: ['GET'])]
+    #[Route('/purchases', methods: ['GET'])]
+    #[Route('/purchases/', methods: ['GET'])]
     public function index(): JsonResponse
     {
         $purchases = $this->purchaseRepository->findAll();
@@ -46,7 +45,7 @@ class PurchaseController extends AbstractController
         return $this->json($responsePayload, Response::HTTP_OK);
     }
 
-    #[Route('/offer/{offerId}', methods: ['GET'])]
+    #[Route('/purchases/offer/{offerId}', methods: ['GET'])]
     public function byOffer(int $offerId): JsonResponse
     {
         $filtered = $this->purchaseRepository->findBy(['offerId' => $offerId]);
@@ -66,8 +65,28 @@ class PurchaseController extends AbstractController
         return $this->json($responsePayload, Response::HTTP_OK);
     }
 
-    #[Route('', methods: ['POST'])]
-    #[Route('/', methods: ['POST'])]
+    #[Route('/purchases-super', methods: ['GET'])]
+    #[Route('/purchases-super/', methods: ['GET'])]
+    public function superPurchases(): JsonResponse
+    {
+        $purchases = $this->purchaseRepository
+            ->createQueryBuilder('p')
+            ->andWhere('p.superSeller IS NOT NULL')
+            ->getQuery()
+            ->getResult();
+
+        $responsePayload = array_map(
+            static fn(Purchase $purchase) => array_merge($purchase->toArray(), [
+                'superSellerId' => $purchase->getSuperSeller()?->getId(),
+            ]),
+            $purchases
+        );
+
+        return $this->json($responsePayload, Response::HTTP_OK);
+    }
+
+    #[Route('/purchases', methods: ['POST'])]
+    #[Route('/purchases/', methods: ['POST'])]
     public function create(Request $request, EntityManagerInterface $entityManager): JsonResponse
     {
         $payload = json_decode($request->getContent(), true);
