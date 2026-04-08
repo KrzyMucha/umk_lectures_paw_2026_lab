@@ -18,6 +18,10 @@ class User
     #[ORM\Column(type: 'simple_array')]
     private array $roles;
 
+    #[ORM\ManyToOne(targetEntity: SuperSeller::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?SuperSeller $superSeller = null;
+
     public function __construct(
         #[ORM\Column(length: 255, unique: true)]
         private string $email,
@@ -39,6 +43,9 @@ class User
 
     public function getLastName(): string { return $this->lastName; }
     public function setLastName(string $lastName): self { $this->lastName = $lastName; return $this; }
+
+    public function getSuperSeller(): ?SuperSeller { return $this->superSeller; }
+    public function setSuperSeller(?SuperSeller $superSeller): self { $this->superSeller = $superSeller; return $this; }
 
     public function getFullName(): string { return $this->firstName . ' ' . $this->lastName; }
 

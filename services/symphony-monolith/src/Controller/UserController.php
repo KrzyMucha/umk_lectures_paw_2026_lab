@@ -13,7 +13,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/users')]
 class UserController extends AbstractController
 {
     public function __construct(
@@ -21,8 +20,8 @@ class UserController extends AbstractController
         private readonly UserRepository $userRepository,
     ) {}
 
-    #[Route('', methods: ['GET'])]
-    #[Route('/', methods: ['GET'])]
+    #[Route('/users', methods: ['GET'])]
+    #[Route('/users/', methods: ['GET'])]
     public function index(): JsonResponse
     {
         $users = $this->userRepository->findAll();
@@ -52,8 +51,32 @@ class UserController extends AbstractController
         );
     }
 
-    #[Route('', methods: ['POST'])]
-    #[Route('/', methods: ['POST'])]
+    #[Route('/users-super', methods: ['GET'])]
+    #[Route('/users-super/', methods: ['GET'])]
+    public function superUsers(): JsonResponse
+    {
+        $users = $this->userRepository->findUsersWithSuperSeller();
+
+        $responsePayload = array_map(static function (User $user): array {
+            $payload = $user->toArray();
+            $payload['superSellerId'] = $user->getSuperSeller()?->getId();
+
+            return $payload;
+        }, $users);
+
+        $this->logger->info('Super users fetched', [
+            'endpoint' => '/users-super',
+            'results_count' => count($responsePayload),
+        ]);
+
+        return $this->json(
+            $responsePayload,
+            Response::HTTP_OK,
+        );
+    }
+
+    #[Route('/users', methods: ['POST'])]
+    #[Route('/users/', methods: ['POST'])]
     public function create(Request $request, EntityManagerInterface $em): JsonResponse
     {
         $body = json_decode($request->getContent(), true);
