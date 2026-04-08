@@ -12,4 +12,13 @@ class UserRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, User::class);
     }
+
+    /** @return User[] */
+    public function findUsersWithSuperSeller(): array
+    {
+        return $this->createQueryBuilder('u')
+            ->andWhere('u.superSeller IS NOT NULL')
+            ->getQuery()
+            ->getResult();
+    }
 }
