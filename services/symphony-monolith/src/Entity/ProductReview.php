@@ -6,6 +6,7 @@ namespace App\Entity;
 
 use App\Repository\ProductReviewRepository;
 use Doctrine\ORM\Mapping as ORM;
+use App\Entity\Offer;
 
 #[ORM\Entity(repositoryClass: ProductReviewRepository::class)]
 class ProductReview
@@ -27,6 +28,10 @@ class ProductReview
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $authorName = null;
+
+    #[ORM\ManyToOne(targetEntity: Offer::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Offer $offer = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -50,15 +55,20 @@ class ProductReview
     public function getAuthorName(): ?string { return $this->authorName; }
     public function setAuthorName(?string $name): self { $this->authorName = $name; return $this; }
 
+    public function getOffer(): ?Offer { return $this->offer; }
+    public function setOffer(?Offer $offer): self { $this->offer = $offer; return $this; }
+
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
 
     public function toArray(): array
     {
         return [
             'id'         => $this->id,
+            'productId'  => $this->product?->getId(),
             'rating'     => $this->rating,
             'comment'    => $this->comment,
             'authorName' => $this->authorName,
+            'offerId'    => $this->offer?->getId(),
             'createdAt'  => $this->createdAt->format(\DateTimeInterface::ATOM),
         ];
     }
