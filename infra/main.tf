@@ -17,6 +17,12 @@ provider "google" {
   region  = var.region
 }
 
+locals {
+  selected_user_service_url = var.user_service_target == "prod" ? google_cloud_run_v2_service.user_service_prod.uri : google_cloud_run_v2_service.user_service_dev.uri
+  user_service_dev_database_url_socket = format("postgresql://%s:%s@/%s?host=/cloudsql/%s", google_sql_user.dev.name, random_password.db_dev_password.result, google_sql_database.dev.name, google_sql_database_instance.dev.connection_name)
+  user_service_prod_database_url_socket = format("postgresql://%s:%s@/%s?host=/cloudsql/%s", google_sql_user.prod.name, random_password.db_prod_password.result, google_sql_database.prod.name, google_sql_database_instance.prod.connection_name)
+}
+
 resource "random_password" "db_dev_password" {
   length  = 24
   special = false
@@ -130,6 +136,11 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
         name  = "APP_ENV"
         value = "prod"
       }
+
+      env {
+        name  = "USER_SERVICE_BASE_URL"
+        value = local.selected_user_service_url
+      }
     }
 
     scaling {
@@ -146,6 +157,66 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
 
 # Cloud Build service account musi mieć prawo pushować obrazy do Artifact Registry
 data "google_project" "project" {}
+
+resource "google_service_account" "user_service_dev" {
+  account_id   = "user-service-dev-sa"
+  display_name = "user-service-dev Cloud Run service account"
+}
+
+resource "google_service_account" "user_service_prod" {
+  account_id   = "user-service-prod-sa"
+  display_name = "user-service-prod Cloud Run service account"
+}
+
+resource "google_project_iam_member" "user_service_dev_cloudsql_client" {
+  project = var.project
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.user_service_dev.email}"
+}
+
+resource "google_project_iam_member" "user_service_prod_cloudsql_client" {
+  project = var.project
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.user_service_prod.email}"
+}
+
+resource "google_secret_manager_secret" "user_service_dev_database_url" {
+  secret_id = "user-service-dev-database-url"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "user_service_dev_database_url" {
+  secret      = google_secret_manager_secret.user_service_dev_database_url.id
+  secret_data = local.user_service_dev_database_url_socket
+}
+
+resource "google_secret_manager_secret" "user_service_prod_database_url" {
+  secret_id = "user-service-prod-database-url"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "user_service_prod_database_url" {
+  secret      = google_secret_manager_secret.user_service_prod_database_url.id
+  secret_data = local.user_service_prod_database_url_socket
+}
+
+resource "google_secret_manager_secret_iam_member" "user_service_dev_secret_accessor" {
+  secret_id = google_secret_manager_secret.user_service_dev_database_url.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.user_service_dev.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "user_service_prod_secret_accessor" {
+  secret_id = google_secret_manager_secret.user_service_prod_database_url.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.user_service_prod.email}"
+}
 
 resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
   location   = google_artifact_registry_repository.mini_allegro.location
