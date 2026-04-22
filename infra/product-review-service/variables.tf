@@ -13,7 +13,7 @@ variable "region" {
 variable "service_name" {
   description = "Cloud Run service name"
   type        = string
-  default     = "products-service-dev"
+  default     = "product-review-service-dev"
 }
 
 variable "image" {

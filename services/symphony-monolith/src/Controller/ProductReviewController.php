@@ -14,19 +14,24 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class ProductReviewController extends AbstractController
 {
     #[Route('/product-reviews', methods: ['GET'])]
     #[Route('/product-reviews/', methods: ['GET'])]
-    public function index(ProductReviewRepository $reviewRepo): JsonResponse
+    public function index(HttpClientInterface $httpClient): JsonResponse
     {
-        $data = array_map(
-            static fn(ProductReview $r) => $r->toArray(),
-            $reviewRepo->findAll()
-        );
+        $serviceUrl = $_ENV['PRODUCT_REVIEW_SERVICE_URL'] ?? '';
 
-        return new JsonResponse($data);
+        try {
+            $response = $httpClient->request('GET', $serviceUrl . '/product-reviews', [
+                'timeout' => 5,
+            ]);
+            return new JsonResponse($response->toArray(), $response->getStatusCode());
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => 'product-review-service unavailable'], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
     #[Route('/product-reviews', methods: ['POST'])]

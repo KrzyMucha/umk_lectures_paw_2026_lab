@@ -1,23 +1,21 @@
-name: Deploy products-service DEV
+name: Deploy product-review-service DEV
 
 on:
   push:
     branches:
       - develop
-      - km-22-kwietnia-new-service   # TODO: usunąć przed mergem
-      - km-22-kwietnia-new-service-1 # TODO: usunąć przed mergem
     paths:
-      - "services/products-service/**"
-      - "infra/products-service/**"
-      - ".github/workflows/deploy-products-service.yml"
+      - "services/product-review-service/**"
+      - "infra/product-review-service/**"
+      - ".github/workflows/deploy-product-review-service.yml"
 
 env:
   PROJECT_ID: project-f5f4f6f0-acae-485b-a16
   REGION: europe-central2
   REGISTRY: europe-central2-docker.pkg.dev
   REPOSITORY: mini-allegro
-  IMAGE: products-service
-  SERVICE_DEV: products-service-dev
+  IMAGE: product-review-service
+  SERVICE_DEV: product-review-service-dev
 
 jobs:
   validate-secrets:
@@ -29,6 +27,7 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
         run: |
           missing=0
           if [ -z "$GCP_SA_KEY" ]; then
@@ -37,6 +36,10 @@ jobs:
           fi
           if [ -z "$TF_STATE_BUCKET" ]; then
             echo "Missing required secret: TF_STATE_BUCKET"
+            missing=1
+          fi
+          if [ -z "$DEV_DATABASE_URL" ]; then
+            echo "Missing required secret: DEV_DATABASE_URL"
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
@@ -74,15 +77,15 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: services/products-service
-          file: services/products-service/Dockerfile
+          context: services/product-review-service
+          file: services/product-review-service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   terraform:
-    name: Terraform apply (products-service infra)
+    name: Terraform apply (product-review-service infra)
     needs: build
     runs-on: ubuntu-latest
     environment: dev
@@ -105,15 +108,15 @@ jobs:
           gcloud storage buckets create gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} --location=${{ env.REGION }}
 
       - name: Terraform init
-        working-directory: infra/products-service
+        working-directory: infra/product-review-service
         run: |
           terraform init \
             -input=false \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="prefix=products-service/dev"
+            -backend-config="prefix=product-review-service/dev"
 
       - name: Terraform apply
-        working-directory: infra/products-service
+        working-directory: infra/product-review-service
         run: |
           terraform apply \
             -input=false \
@@ -140,15 +143,15 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
 
-      - name: Health check GET /products
+      - name: Health check GET /product-reviews
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_DEV }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "DEV URL: $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/products")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/product-reviews")
           if [ "$STATUS" != "200" ]; then
             echo "Health check failed! Got HTTP $STATUS"
             exit 1
           fi
-          echo "products-service is healthy"
+          echo "product-review-service is healthy"

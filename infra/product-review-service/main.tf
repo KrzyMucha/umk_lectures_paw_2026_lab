@@ -14,7 +14,7 @@ provider "google" {
   region  = var.region
 }
 
-resource "google_cloud_run_v2_service" "products_service" {
+resource "google_cloud_run_v2_service" "product_review_service" {
   name     = var.service_name
   location = var.region
 
@@ -23,12 +23,7 @@ resource "google_cloud_run_v2_service" "products_service" {
       image = var.image
 
       ports {
-        container_port = 8081
-      }
-
-      env {
-        name  = "DATABASE_URL"
-        value = var.database_url
+        container_port = 8080
       }
 
       resources {
@@ -37,12 +32,17 @@ resource "google_cloud_run_v2_service" "products_service" {
           memory = "512Mi"
         }
       }
+
+      env {
+        name  = "DATABASE_URL"
+        value = var.database_url
+      }
     }
   }
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  name     = google_cloud_run_v2_service.products_service.name
+  name     = google_cloud_run_v2_service.product_review_service.name
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
