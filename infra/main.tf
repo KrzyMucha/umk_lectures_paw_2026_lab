@@ -130,11 +130,6 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
         name  = "APP_ENV"
         value = "prod"
       }
-
-      env {
-        name  = "OFFERS_SERVICE_URL"
-        value = google_cloud_run_v2_service.offers_service.uri
-      }
     }
 
     scaling {
