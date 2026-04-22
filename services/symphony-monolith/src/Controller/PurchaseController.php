@@ -11,27 +11,63 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class PurchaseController extends AbstractController
 {
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly PurchaseRepository $purchaseRepository,
+        private readonly HttpClientInterface $httpClient,
     ) {}
 
     #[Route('/purchases', methods: ['GET'])]
     #[Route('/purchases/', methods: ['GET'])]
     public function index(): JsonResponse
     {
-        $purchases = $this->purchaseRepository->findAll();
+        $purchaseServiceUrl = rtrim((string) ($_ENV['PURCHASE_SERVICE_URL'] ?? $_SERVER['PURCHASE_SERVICE_URL'] ?? ''), '/');
+        if ($purchaseServiceUrl === '') {
+            return new JsonResponse([
+                'error' => 'Purchase service unavailable',
+                'details' => 'PURCHASE_SERVICE_URL is not configured',
+            ], Response::HTTP_BAD_GATEWAY);
+        }
 
-        $responsePayload = array_map(fn(Purchase $purchase) => $purchase->toArray(), $purchases);
+        try {
+            $response = $this->httpClient->request('GET', sprintf('%s/purchases', $purchaseServiceUrl), [
+                'timeout' => 5,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $rawBody = $response->getContent(false);
+
+            if ($statusCode >= 400) {
+                return new JsonResponse([
+                    'error' => 'Purchase service returned an error',
+                    'statusCode' => $statusCode,
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            $decoded = json_decode($rawBody, true);
+            if (!is_array($decoded)) {
+                return new JsonResponse([
+                    'error' => 'Purchase service returned invalid payload',
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            $responsePayload = $decoded;
+        } catch (\Throwable $exception) {
+            return new JsonResponse([
+                'error' => 'Purchase service unavailable',
+                'details' => $exception->getMessage(),
+            ], Response::HTTP_BAD_GATEWAY);
+        }
 
         // Aggregate stats for logging (no PII)
-        $totalRevenue = array_reduce($purchases, fn($sum, $p) => $sum + $p->getTotalPrice(), 0);
+        $totalRevenue = array_reduce($responsePayload, fn($sum, $p) => $sum + ((float) ($p['totalPrice'] ?? 0)), 0.0);
         $statusCounts = [];
-        foreach ($purchases as $p) {
-            $status = $p->getStatus();
+        foreach ($responsePayload as $p) {
+            $status = (string) ($p['status'] ?? 'unknown');
             $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
         }
 
@@ -40,6 +76,7 @@ class PurchaseController extends AbstractController
             'results_count' => count($responsePayload),
             'total_revenue' => $totalRevenue,
             'status_distribution' => $statusCounts,
+            'source' => 'purchase-service',
         ]);
 
         return $this->json($responsePayload, Response::HTTP_OK);
