@@ -50,3 +50,9 @@ variable "db_prod_name" {
   type        = string
   default     = "mini_allegro_prod"
 }
+
+variable "offers_service_name" {
+  description = "Cloud Run service name for the offers microservice"
+  type        = string
+  default     = "offers-service"
+}
