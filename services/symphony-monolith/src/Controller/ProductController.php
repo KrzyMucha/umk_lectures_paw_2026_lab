@@ -8,6 +8,7 @@ use App\Entity\Product;
 use App\Entity\ProductReview;
 use App\Repository\ProductRepository;
 use App\Repository\ProductReviewRepository;
+use App\Service\ProductsServiceClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,10 +19,20 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/products')]
 class ProductController extends AbstractController
 {
+    public function __construct(
+        private readonly ProductsServiceClient $productsServiceClient,
+    ) {}
+
     #[Route('', methods: ['GET'])]
     #[Route('/', methods: ['GET'])]
     public function index(ProductRepository $productRepo, ProductReviewRepository $reviewRepo): JsonResponse
     {
+        $remoteProducts = $this->productsServiceClient->fetchProducts();
+
+        if ($remoteProducts !== null) {
+            return new JsonResponse($remoteProducts);
+        }
+
         $products = $productRepo->findAll();
 
         $data = array_map(static function (Product $product) use ($reviewRepo) {

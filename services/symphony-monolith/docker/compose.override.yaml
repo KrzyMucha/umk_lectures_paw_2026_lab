@@ -2,3 +2,4 @@ services:
   app:
     environment:
       APP_SECRET: "de7af9309aaba9542fe4fe4de71c4f82"
+      PRODUCTS_SERVICE_URL: "${PRODUCTS_SERVICE_URL:-http://host.docker.internal:8081}"
