@@ -1,4 +1,5 @@
 parameters:
+    env(PRODUCTS_SERVICE_URL): ''
 
 services:
     _defaults:
@@ -14,4 +15,4 @@ services:
 
     App\Service\ProductsServiceClient:
         arguments:
-            $baseUrl: '%env(default::PRODUCTS_SERVICE_URL)%'
+            $baseUrl: '%env(PRODUCTS_SERVICE_URL)%'
