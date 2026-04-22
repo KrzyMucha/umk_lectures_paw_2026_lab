@@ -15,12 +15,12 @@ Usage:
   ./scripts/local-app.sh <command>
 
 Commands:
-  up         Build/start app; if already running, reuse and stream logs
-  stop       Stop app container (without removing volumes)
+  up         Build/start app + user-service; if app is running, reuse and stream logs
+  stop       Stop app and user-service containers (without removing volumes)
   down       Stop stack and remove volumes
-  restart    Recreate app container and stream logs (Ctrl+C stops app)
-  logs       Show docker compose logs (follow mode)
-  status     Show docker compose services status
+  restart    Recreate app + user-service containers and stream logs (Ctrl+C detaches)
+  logs       Show docker compose logs for app + user-service (follow mode)
+  status     Show docker compose services status for app + user-service
   test       Run Python integration tests (integ-tests)
   help       Show this help
 
@@ -115,10 +115,10 @@ case "$cmd" in
   up)
     ensure_port_free 8080
     resolve_dev_database_url
-    run_compose up --build --no-deps app
+    run_compose up --build app user-service
     ;;
   stop)
-    run_compose stop app
+    run_compose stop app user-service
     ;;
   down)
     run_compose down -v
@@ -127,13 +127,13 @@ case "$cmd" in
     run_compose down -v
     ensure_port_free 8080
     resolve_dev_database_url
-    run_compose up --build --no-deps app
+    run_compose up --build app user-service
     ;;
   logs)
-    run_compose logs -f app
+    run_compose logs -f app user-service
     ;;
   status)
-    run_compose ps app
+    run_compose ps app user-service
     ;;
   test)
     VENV_DIR="$ROOT_DIR/.venv"

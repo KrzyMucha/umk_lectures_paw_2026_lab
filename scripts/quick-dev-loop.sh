@@ -15,6 +15,7 @@ RUN_PRODUCTS_CHECK="true"
 PLATFORM="linux/amd64"
 # DEV-only fallback – w CI/CD ustaw APP_SECRET jako secret w GitHub/Cloud Build
 APP_SECRET="${APP_SECRET:-de7af9309aaba9542fe4fe4de71c4f82}"
+USER_SERVICE_BASE_URL="${USER_SERVICE_BASE_URL:-}"
 
 usage() {
   cat <<'EOF'
@@ -41,6 +42,7 @@ Options:
   --keep-server-version     Do not strip serverVersion query param from DATABASE_URL
   --skip-products-check     Check only /health
   --app-secret <secret>     Override APP_SECRET (default: DEV hardcoded fallback)
+  --user-service-url <url>  Override USER_SERVICE_BASE_URL
   -h, --help                Show this help
 
 Examples:
@@ -91,6 +93,23 @@ sanitize_database_url() {
   fi
 }
 
+resolve_user_service_base_url() {
+  if [[ -n "$USER_SERVICE_BASE_URL" ]]; then
+    return
+  fi
+
+  local tf_url
+  tf_url="$(terraform -chdir="$ROOT_DIR/infra" output -raw user_service_dev_url 2>/dev/null || true)"
+
+  if [[ -z "$tf_url" ]]; then
+    echo "Cannot resolve USER_SERVICE_BASE_URL from terraform output user_service_dev_url." >&2
+    echo "Pass --user-service-url or export USER_SERVICE_BASE_URL." >&2
+    exit 1
+  fi
+
+  USER_SERVICE_BASE_URL="$tf_url"
+}
+
 TAG="manual-$(date +%s)-$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo nogit)"
 
 while [[ $# -gt 0 ]]; do
@@ -139,6 +158,10 @@ while [[ $# -gt 0 ]]; do
       APP_SECRET="$2"
       shift 2
       ;;
+    --user-service-url)
+      USER_SERVICE_BASE_URL="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -167,6 +190,7 @@ fi
 
 resolve_database_url
 sanitize_database_url
+resolve_user_service_base_url
 
 if [[ -z "$DATABASE_URL" ]]; then
   echo "Resolved DATABASE_URL is empty." >&2
@@ -191,7 +215,7 @@ echo "==> Deploying Cloud Run service: $SERVICE_NAME"
 gcloud run deploy "$SERVICE_NAME" \
   --region "$REGION" \
   --image "$IMAGE" \
-  --set-env-vars "APP_ENV=dev,DATABASE_URL=$DATABASE_URL,APP_SECRET=$APP_SECRET" \
+  --set-env-vars "APP_ENV=dev,DATABASE_URL=$DATABASE_URL,APP_SECRET=$APP_SECRET,USER_SERVICE_BASE_URL=$USER_SERVICE_BASE_URL" \
   --quiet
 
 URL="$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format='value(status.url)')"

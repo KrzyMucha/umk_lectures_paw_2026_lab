@@ -6,8 +6,10 @@ on:
       - develop
     paths:
       - "infra/dev/**"
+      - "infra/user-service.tf"
       - "services/symphony-monolith/**"
       - "services/product-review-service/**"
+      - "services/user-service/**"
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
@@ -21,7 +23,9 @@ env:
   REGISTRY: europe-central2-docker.pkg.dev
   REPOSITORY: mini-allegro
   IMAGE: mini-allegro
+  IMAGE_USER: user-service
   SERVICE_DEV: mini-allegro-dev
+  USER_SERVICE_DEV: user-service-dev
 
 jobs:
   validate-secrets:
@@ -140,6 +144,76 @@ jobs:
           tags: ${{ steps.meta.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  build-user-service-dev:
+    name: Build & Push user-service image (DEV tag)
+    needs: terraform-dev
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Generate DEV user-service image tag
+        id: meta
+        run: |
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_USER }}:${{ github.sha }}-dev"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push user-service image (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: services/user-service
+          file: services/user-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-user-service-dev:
+    name: Deploy user-service to DEV
+    needs: build-user-service-dev
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy user-service to Cloud Run DEV
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.USER_SERVICE_DEV }}
+          region: ${{ env.REGION }}
+          image: ${{ needs.build-user-service-dev.outputs.image_tag }}
+
+      - name: user-service DEV health-check (HTTP 200)
+        run: |
+          URL=$(gcloud run services describe ${{ env.USER_SERVICE_DEV }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/users")
+          echo "User-service DEV URL: $URL"
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "User-service health check failed! Got HTTP $STATUS"
+            exit 1
+          fi
 
   deploy-dev:
     name: Deploy to DEV
@@ -267,7 +341,7 @@ jobs:
 
   integration-tests-dev:
     name: Integration tests (DEV)
-    needs: [deploy-dev, deploy-product-review-service]
+    needs: [ deploy-dev, deploy-product-review-service, deploy-user-service-dev ]
     runs-on: ubuntu-latest
 
     steps:

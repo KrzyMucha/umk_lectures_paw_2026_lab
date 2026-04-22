@@ -3,6 +3,21 @@ output "service_url" {
   value       = google_cloud_run_v2_service.mini_allegro.uri
 }
 
+output "user_service_url" {
+  description = "URL of the user-service selected by var.user_service_target"
+  value       = local.selected_user_service_url
+}
+
+output "user_service_dev_url" {
+  description = "URL of the deployed DEV user-service Cloud Run service"
+  value       = google_cloud_run_v2_service.user_service_dev.uri
+}
+
+output "user_service_prod_url" {
+  description = "URL of the deployed PROD user-service Cloud Run service"
+  value       = google_cloud_run_v2_service.user_service_prod.uri
+}
+
 output "artifact_registry_repository" {
   description = "Artifact Registry repository URL"
   value       = "${var.region}-docker.pkg.dev/${var.project}/${google_artifact_registry_repository.mini_allegro.repository_id}"
