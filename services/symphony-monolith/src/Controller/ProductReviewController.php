@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\ProductReview;
+use App\Repository\OfferRepository;
 use App\Repository\ProductRepository;
 use App\Repository\ProductReviewRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,24 +14,28 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-#[Route('/product-reviews')]
 class ProductReviewController extends AbstractController
 {
-    #[Route('', methods: ['GET'])]
-    #[Route('/', methods: ['GET'])]
-    public function index(ProductReviewRepository $reviewRepo): JsonResponse
+    #[Route('/product-reviews', methods: ['GET'])]
+    #[Route('/product-reviews/', methods: ['GET'])]
+    public function index(HttpClientInterface $httpClient): JsonResponse
     {
-        $data = array_map(
-            static fn(ProductReview $r) => $r->toArray(),
-            $reviewRepo->findAll()
-        );
+        $serviceUrl = $_ENV['PRODUCT_REVIEW_SERVICE_URL'] ?? '';
 
-        return new JsonResponse($data);
+        try {
+            $response = $httpClient->request('GET', $serviceUrl . '/product-reviews', [
+                'timeout' => 5,
+            ]);
+            return new JsonResponse($response->toArray(), $response->getStatusCode());
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => 'product-review-service unavailable'], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
-    #[Route('', methods: ['POST'])]
-    #[Route('/', methods: ['POST'])]
+    #[Route('/product-reviews', methods: ['POST'])]
+    #[Route('/product-reviews/', methods: ['POST'])]
     public function create(Request $request, ProductRepository $productRepo, EntityManagerInterface $em): JsonResponse
     {
         $body = json_decode($request->getContent(), true);
@@ -69,6 +74,73 @@ class ProductReviewController extends AbstractController
         $review->setRating($rating);
         $review->setComment($comment);
         $review->setAuthorName($authorName);
+
+        $em->persist($review);
+        $em->flush();
+
+        return new JsonResponse($review->toArray(), Response::HTTP_CREATED);
+    }
+
+    #[Route('/reviews-super', methods: ['GET'])]
+    public function superIndex(ProductReviewRepository $reviewRepo): JsonResponse
+    {
+        $reviews = $reviewRepo->createQueryBuilder('r')
+            ->join('r.offer', 'o')
+            ->join('o.superSeller', 's')
+            ->getQuery()
+            ->getResult();
+
+        $data = array_map(static fn(ProductReview $r) => $r->toArray(), $reviews);
+
+        return new JsonResponse($data);
+    }
+
+    #[Route('/reviews-super', methods: ['POST'])]
+    public function superCreate(Request $request, ProductRepository $productRepo, OfferRepository $offerRepo, EntityManagerInterface $em): JsonResponse
+    {
+        $body = json_decode($request->getContent(), true);
+        if (!is_array($body)) {
+            return new JsonResponse(['error' => 'Invalid JSON payload'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $productId  = $body['productId'] ?? null;
+        $rating     = $body['rating'] ?? null;
+        $comment    = $body['comment'] ?? null;
+        $authorName = $body['authorName'] ?? null;
+        $offerId    = $body['offerId'] ?? null;
+
+        if (!is_int($productId)) {
+            return new JsonResponse(['error' => 'productId must be an integer'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $product = $productRepo->find($productId);
+        if (!$product) {
+            return new JsonResponse(['error' => 'Product not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!is_int($rating) || $rating < 1 || $rating > 5) {
+            return new JsonResponse(['error' => 'Rating must be an integer between 1 and 5'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!is_int($offerId)) {
+            return new JsonResponse(['error' => 'offerId must be an integer'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $offer = $offerRepo->find($offerId);
+        if (!$offer) {
+            return new JsonResponse(['error' => 'Offer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($offer->getSuperSeller() === null) {
+            return new JsonResponse(['error' => 'Offer does not belong to a SuperSeller'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $review = new ProductReview();
+        $review->setProduct($product);
+        $review->setRating($rating);
+        $review->setComment($comment);
+        $review->setAuthorName($authorName);
+        $review->setOffer($offer);
 
         $em->persist($review);
         $em->flush();
