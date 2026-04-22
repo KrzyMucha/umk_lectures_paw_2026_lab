@@ -12,6 +12,7 @@ on:
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
+      - ".github/workflows/deploy-offers-service.yml"
 
 permissions:
   contents: write
@@ -23,7 +24,6 @@ env:
   REPOSITORY: mini-allegro
   IMAGE: mini-allegro
   SERVICE_DEV: mini-allegro-dev
-  OFFERS_IMAGE: offers-service
   OFFERS_SERVICE_DEV: offers-service-dev
 
 jobs:
@@ -144,94 +144,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  build-offers-dev:
-    name: Build & Push offers-service image (DEV tag)
-    needs: terraform-dev
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
-
-      - name: Generate DEV image tag
-        id: meta
-        run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.OFFERS_IMAGE }}:${{ github.sha }}-dev"
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push offers-service image (with cache)
-        uses: docker/build-push-action@v6
-        with:
-          context: services/offers-service
-          file: services/offers-service/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.image_tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   deploy-offers-dev:
-    name: Deploy offers-service to DEV
-    needs: build-offers-dev
-    runs-on: ubuntu-latest
-    environment: dev
-
-    steps:
-      - name: Prepare sanitized DATABASE_URL
-        id: dburl
-        env:
-          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
-        run: |
-          DB_URL="$DEV_DATABASE_URL"
-          DB_URL="$(printf '%s' "$DB_URL" | sed -E 's/([?&])serverVersion=[^&]*(&|$)/\1\2/g; s/\?&/\?/g; s/&&+/&/g; s/[?&]$//')"
-
-          if [ -z "$DB_URL" ]; then
-            echo "Sanitized DATABASE_URL is empty"
-            exit 1
-          fi
-
-          echo "::add-mask::$DB_URL"
-          echo "value=$DB_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Deploy offers-service to Cloud Run DEV
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.OFFERS_SERVICE_DEV }}
-          region: ${{ env.REGION }}
-          image: ${{ needs.build-offers-dev.outputs.image_tag }}
-          env_vars: |
-            DATABASE_URL=${{ steps.dburl.outputs.value }}
-            PORT=8082
-
-      - name: Offers-service DEV health-check (HTTP 200)
-        run: |
-          URL=$(gcloud run services describe ${{ env.OFFERS_SERVICE_DEV }} \
-            --region=${{ env.REGION }} \
-            --format='value(status.url)')
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
-          echo "Offers DEV URL: $URL"
-          echo "HTTP Status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Health check failed! Got HTTP $STATUS"
-            exit 1
-          fi
+    name: Deploy offers-service (DEV)
+    needs: terraform-dev
+    uses: ./.github/workflows/deploy-offers-service.yml
+    with:
+      environment: dev
+      service_name: offers-service-dev
+      image_tag_suffix: dev
+      sha: ${{ github.sha }}
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
 
   deploy-dev:
     name: Deploy to DEV
@@ -261,15 +185,6 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Resolve offers-service DEV URL
-        id: offers_url
-        run: |
-          OFFERS_URL=$(gcloud run services describe ${{ env.OFFERS_SERVICE_DEV }} \
-            --region=${{ env.REGION }} \
-            --format='value(status.url)')
-          echo "offers_url=${OFFERS_URL}" >> "$GITHUB_OUTPUT"
-          echo "Offers service URL: $OFFERS_URL"
-
       - name: Deploy to Cloud Run DEV
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -280,7 +195,7 @@ jobs:
             APP_ENV=dev
             DATABASE_URL=${{ steps.dburl.outputs.value }}
             APP_SECRET=${{ secrets.APP_SECRET }}
-            OFFERS_SERVICE_URL=${{ steps.offers_url.outputs.offers_url }}
+            OFFERS_SERVICE_URL=${{ needs.deploy-offers-dev.outputs.offers_service_url }}
 
       - name: DEV health-check (HTTP 200)
         run: |
