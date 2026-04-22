@@ -1,4 +1,5 @@
 parameters:
+    env(PRODUCTS_SERVICE_URL): ''
 
 services:
     _defaults:
@@ -11,3 +12,7 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+
+    App\Service\ProductsServiceClient:
+        arguments:
+            $baseUrl: '%env(PRODUCTS_SERVICE_URL)%'
