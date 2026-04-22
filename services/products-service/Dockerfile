@@ -1,5 +1,5 @@
 # Stage 1 – build fat JAR
-FROM sbtscala/scala-sbt:eclipse-temurin-21_1.10.11_3.6.4 AS builder
+FROM sbtscala/scala-sbt:eclipse-temurin-21.0.8_9_1.12.9_3.3.7 AS builder
 WORKDIR /app
 COPY . .
 RUN sbt assembly
