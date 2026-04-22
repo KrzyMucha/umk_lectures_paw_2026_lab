@@ -38,11 +38,6 @@ resource "google_cloud_run_v2_service" "offers_service" {
         name  = "DATABASE_URL"
         value = var.database_url
       }
-
-      env {
-        name  = "PORT"
-        value = "8082"
-      }
     }
   }
 }
