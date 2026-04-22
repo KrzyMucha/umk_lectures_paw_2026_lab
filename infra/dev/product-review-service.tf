@@ -1,3 +1,8 @@
+import {
+  id = "projects/project-f5f4f6f0-acae-485b-a16/locations/europe-central2/services/product-review-service-dev"
+  to = google_cloud_run_v2_service.product_review_service
+}
+
 resource "google_cloud_run_v2_service" "product_review_service" {
   name     = "product-review-service-dev"
   location = var.region
