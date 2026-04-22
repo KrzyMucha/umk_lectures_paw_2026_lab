@@ -26,14 +26,6 @@ resource "google_cloud_run_v2_service" "products_service" {
         container_port = 8081
       }
 
-<<<<<<< HEAD
-      env {
-        name  = "PORT"
-        value = "8081"
-      }
-
-=======
->>>>>>> 2ebfdb3 (workflow and infra for product service)
       resources {
         limits = {
           cpu    = "1"
