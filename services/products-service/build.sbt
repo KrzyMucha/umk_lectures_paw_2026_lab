@@ -5,10 +5,13 @@ lazy val root = (project in file("."))
   .settings(
     name := "products-service",
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-ember-server" % "0.23.30",
-      "org.http4s" %% "http4s-dsl"          % "0.23.30",
-      "org.http4s" %% "http4s-circe"        % "0.23.30",
-      "io.circe"   %% "circe-generic"       % "0.14.10",
+      "org.http4s"    %% "http4s-ember-server" % "0.23.30",
+      "org.http4s"    %% "http4s-dsl"          % "0.23.30",
+      "org.http4s"    %% "http4s-circe"        % "0.23.30",
+      "io.circe"      %% "circe-generic"       % "0.14.10",
+      "org.tpolecat"  %% "doobie-core"         % "1.0.0-RC6",
+      "org.tpolecat"  %% "doobie-postgres"     % "1.0.0-RC6",
+      "org.tpolecat"  %% "doobie-hikari"       % "1.0.0-RC6",
     ),
     assembly / mainClass := Some("products.Main"),
     assembly / assemblyMergeStrategy := {
