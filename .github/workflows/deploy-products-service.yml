@@ -137,8 +137,12 @@ jobs:
           service: ${{ env.SERVICE_DEV }}
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
+<<<<<<< HEAD
           env_vars: |
             PORT=8081
+=======
+
+>>>>>>> 2ebfdb3 (workflow and infra for product service)
 
       - name: Health check GET /products
         run: |
