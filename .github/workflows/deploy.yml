@@ -297,7 +297,6 @@ jobs:
           image: ${{ needs.build-purchase-dev.outputs.image_tag }}
           flags: --add-cloudsql-instances=${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DEV_DB_INSTANCE_NAME }}
           env_vars: |
-            PORT=8080
             DATABASE_URL=${{ steps.purchase_dburl.outputs.value }}
 
       - name: purchase-service DEV health-check (HTTP 200)
