@@ -35,6 +35,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  test-offers-service:
+    name: Run offers-service unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.1"
+
+      - name: Run tests
+        working-directory: services/offers-service
+        run: go test ./... -v
+
   build-offers-image-check:
     name: Build offers-service Docker image (CI)
     runs-on: ubuntu-latest
