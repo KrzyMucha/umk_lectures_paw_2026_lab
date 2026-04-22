@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - km-22-kwietnia-new-service-2
     paths:
       - "infra/dev/**"
       - "services/symphony-monolith/**"
