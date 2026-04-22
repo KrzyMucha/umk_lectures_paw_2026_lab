@@ -26,6 +26,11 @@ resource "google_cloud_run_v2_service" "products_service" {
         container_port = 8081
       }
 
+      env {
+        name  = "DATABASE_URL"
+        value = var.database_url
+      }
+
       resources {
         limits = {
           cpu    = "1"
