@@ -7,7 +7,8 @@ on:
     paths:
       - "infra/**"
       - "infra/dev/**"
-      - "services/purchase-service/**"
+      - "services/symphony-monolith/**"
+      - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
   pull_request:
@@ -16,7 +17,8 @@ on:
     paths:
       - "infra/**"
       - "infra/dev/**"
-      - "services/purchase-service/**"
+      - "services/symphony-monolith/**"
+      - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
 
@@ -29,9 +31,7 @@ env:
   REGISTRY: europe-central2-docker.pkg.dev
   REPOSITORY: mini-allegro
   IMAGE: mini-allegro
-  IMAGE_PURCHASE: purchase-service
   SERVICE_DEV: mini-allegro-dev
-  SERVICE_PURCHASE_DEV: purchase-service-dev
   DEV_DB_INSTANCE_NAME: mini-allegro-db-dev
 
 jobs:
@@ -205,109 +205,6 @@ jobs:
             exit 1
           fi
 
-  build-purchase-dev:
-    name: Build & Push purchase-service image (DEV tag)
-    needs: terraform-dev
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
-
-      - name: Generate purchase-service DEV image tag
-        id: meta
-        run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_PURCHASE }}:${{ github.sha }}-dev"
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push purchase-service image (with cache)
-        uses: docker/build-push-action@v6
-        with:
-          context: services/purchase-service
-          file: services/purchase-service/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.image_tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy-purchase-dev:
-    name: Deploy purchase-service to DEV
-    needs: build-purchase-dev
-    runs-on: ubuntu-latest
-    environment: dev
-
-    steps:
-      - name: Build socket DATABASE_URL for purchase-service
-        id: purchase_dburl
-        env:
-          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
-          PROJECT_ID: ${{ env.PROJECT_ID }}
-          REGION: ${{ env.REGION }}
-          DB_INSTANCE: ${{ env.DEV_DB_INSTANCE_NAME }}
-        run: |
-          SOCKET_URL=$(python - <<'PY'
-          import os
-          from urllib.parse import urlparse, unquote
-
-          raw = os.environ["DEV_DATABASE_URL"]
-          p = urlparse(raw)
-          user = p.username or "app"
-          password = unquote(p.password or "")
-          dbname = (p.path or "/").lstrip("/") or "mini_allegro_dev"
-          cloudsql = f"{os.environ['PROJECT_ID']}:{os.environ['REGION']}:{os.environ['DB_INSTANCE']}"
-          print(f"postgresql://{user}:{password}@/{dbname}?host=/cloudsql/{cloudsql}")
-          PY
-          )
-
-          if [ -z "$SOCKET_URL" ]; then
-            echo "Failed to build socket DATABASE_URL"
-            exit 1
-          fi
-
-          echo "::add-mask::$SOCKET_URL"
-          echo "value=$SOCKET_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Deploy purchase-service to Cloud Run DEV
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE_PURCHASE_DEV }}
-          region: ${{ env.REGION }}
-          image: ${{ needs.build-purchase-dev.outputs.image_tag }}
-          flags: --add-cloudsql-instances=${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DEV_DB_INSTANCE_NAME }}
-          env_vars: |
-            DATABASE_URL=${{ steps.purchase_dburl.outputs.value }}
-
-      - name: purchase-service DEV health-check (HTTP 200)
-        run: |
-          URL=$(gcloud run services describe ${{ env.SERVICE_PURCHASE_DEV }} \
-            --region=${{ env.REGION }} \
-            --format='value(status.url)')
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
-          echo "purchase-service DEV URL: $URL"
-          echo "HTTP Status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Health check failed! Got HTTP $STATUS"
-            exit 1
-          fi
-
   integration-tests-dev:
     name: Integration tests (DEV)
     needs: deploy-dev
@@ -375,7 +272,6 @@ jobs:
     name: Auto-merge develop -> main
     needs:
       - integration-tests-dev
-      - deploy-purchase-dev
     runs-on: ubuntu-latest
 
     steps:
