@@ -33,9 +33,15 @@ jobs:
       - name: Validate required secrets are set
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
         run: |
           if [ -z "$GCP_SA_KEY" ]; then
             echo "Missing required secret: GCP_SA_KEY"
+            exit 1
+          fi
+
+          if [ -z "$DEV_DATABASE_URL" ]; then
+            echo "Missing required secret: DEV_DATABASE_URL"
             exit 1
           fi
 
@@ -96,6 +102,8 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
           flags: --allow-unauthenticated
+          env_vars: |
+            DATABASE_URL=${{ secrets.DEV_DATABASE_URL }}
 
       - name: Health check GET /health
         run: |
