@@ -11,16 +11,6 @@ on:
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
-  pull_request:
-    branches:
-      - develop
-    paths:
-      - "infra/**"
-      - "infra/dev/**"
-      - "services/symphony-monolith/**"
-      - "integ-tests/**"
-      - ".github/workflows/deploy.yml"
-      - ".github/workflows/deploy-prod.yml"
 
 permissions:
   contents: write
