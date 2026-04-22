@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      test: [ "CMD-SHELL", "pg_isready -U app -d app" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,11 +22,7 @@ services:
       dockerfile: docker/Dockerfile
       target: dev
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -fsS http://localhost:8080/health > /dev/null || exit 1",
-        ]
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8080/health > /dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,7 +34,11 @@ services:
       - vendor:/app/vendor
     environment:
       APP_ENV: dev
-      DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL (for local use this should point to DEV Cloud SQL)}"
+      DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL (for local use this should point
+        to DEV Cloud SQL)}"
+      USER_SERVICE_BASE_URL: "${USER_SERVICE_BASE_URL:-http://host.docker.internal:8081}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   vendor:

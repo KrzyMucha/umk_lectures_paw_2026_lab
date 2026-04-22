@@ -1,4 +1,5 @@
 parameters:
+    user_service_base_url: "%env(USER_SERVICE_BASE_URL)%"
 
 services:
     _defaults:
@@ -6,8 +7,12 @@ services:
         autoconfigure: true
 
     App\:
-        resource: '../src/'
+        resource: "../src/"
         exclude:
-            - '../src/DependencyInjection/'
-            - '../src/Entity/'
-            - '../src/Kernel.php'
+            - "../src/DependencyInjection/"
+            - "../src/Entity/"
+            - "../src/Kernel.php"
+
+    App\Service\UserServiceClient:
+        arguments:
+            $userServiceBaseUrl: "%user_service_base_url%"
