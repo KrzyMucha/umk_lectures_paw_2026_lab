@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - km-22-kwietnia-new-service   # TODO: usunąć przed mergem
+      - km-22-kwietnia-new-service-1 # TODO: usunąć przed mergem
     paths:
       - "services/products-service/**"
       - "infra/products-service/**"
