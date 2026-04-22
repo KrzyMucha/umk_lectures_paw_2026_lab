@@ -20,3 +20,9 @@ variable "image" {
   description = "Docker image to deploy"
   type        = string
 }
+
+variable "database_url" {
+  description = "PostgreSQL connection URL"
+  type        = string
+  sensitive   = true
+}

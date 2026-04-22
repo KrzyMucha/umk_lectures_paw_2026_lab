@@ -118,7 +118,8 @@ jobs:
           terraform apply \
             -input=false \
             -auto-approve \
-            -var="image=${{ needs.build.outputs.image_tag }}"
+            -var="image=${{ needs.build.outputs.image_tag }}" \
+            -var="database_url=${{ secrets.DEV_DATABASE_URL }}"
 
   deploy:
     name: Deploy to Cloud Run DEV
