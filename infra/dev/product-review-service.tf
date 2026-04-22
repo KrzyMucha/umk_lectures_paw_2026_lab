@@ -4,7 +4,7 @@ resource "google_cloud_run_v2_service" "product_review_service" {
 
   template {
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project}/mini-allegro/product-review-service:latest"
+      image = "us-docker.pkg.dev/cloudrun/container/hello:latest"
 
       ports {
         container_port = 8080
