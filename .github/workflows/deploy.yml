@@ -7,9 +7,7 @@ on:
     paths:
       - "infra/**"
       - "infra/dev/**"
-      - "services/symphony-monolith/**"
       - "services/purchase-service/**"
-      - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
   pull_request:
@@ -18,9 +16,7 @@ on:
     paths:
       - "infra/**"
       - "infra/dev/**"
-      - "services/symphony-monolith/**"
       - "services/purchase-service/**"
-      - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
 
