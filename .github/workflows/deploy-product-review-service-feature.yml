@@ -6,6 +6,7 @@ on:
       - feat/review-service
     paths:
       - "services/product-review-service/**"
+      - "services/symphony-monolith/**"
       - "infra/product-review-service/**"
       - ".github/workflows/deploy-product-review-service-feature.yml"
 
