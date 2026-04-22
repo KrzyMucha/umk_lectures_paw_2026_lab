@@ -39,6 +39,30 @@ services:
     environment:
       APP_ENV: dev
       DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL (for local use this should point to DEV Cloud SQL)}"
+      OFFERS_SERVICE_URL: "http://offers-service:8082"
+    depends_on:
+      offers-service:
+        condition: service_healthy
+
+  offers-service:
+    build:
+      context: ../../offers-service
+      dockerfile: Dockerfile
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8082/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL (for local use this should point to DEV Cloud SQL)}"
+      PORT: "8082"
 
 volumes:
   vendor:

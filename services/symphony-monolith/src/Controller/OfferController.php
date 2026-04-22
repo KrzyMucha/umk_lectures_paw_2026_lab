@@ -2,10 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\Offer;
-use App\Entity\SuperSeller;
-use App\Repository\OfferRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,99 +12,84 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/offers')]
 class OfferController extends AbstractController
 {
+    private string $offersServiceUrl;
+
     public function __construct(
         private readonly LoggerInterface $logger,
-    ) {}
+    ) {
+        $this->offersServiceUrl = rtrim($_ENV['OFFERS_SERVICE_URL'] ?? 'http://offers-service:8082', '/');
+    }
 
     #[Route('', methods: ['GET'])]
     #[Route('/', methods: ['GET'])]
-    public function index(OfferRepository $offerRepo): JsonResponse
+    public function index(): JsonResponse
     {
-        $offers = $offerRepo->findAll();
-        $responsePayload = array_map(fn(Offer $offer) => $offer->toArray(), $offers);
-
-        $this->logger->info('Offers fetched', [
-            'endpoint' => '/offers',
-            'results_count' => count($responsePayload),
-        ]);
-
-        return $this->json($responsePayload, Response::HTTP_OK);
+        return $this->proxy('GET', '/offers');
     }
 
     #[Route('-super', name: 'offers_super', methods: ['GET'])]
-    public function super(OfferRepository $offerRepo): JsonResponse
+    public function super(): JsonResponse
     {
-        $offers = $offerRepo->createQueryBuilder('o')
-            ->where('o.superSeller IS NOT NULL')
-            ->getQuery()
-            ->getResult();
-
-        $responsePayload = array_map(fn(Offer $offer) => $offer->toArray(), $offers);
-
-        return $this->json($responsePayload, Response::HTTP_OK);
+        return $this->proxy('GET', '/offers-super');
     }
 
     #[Route('-super', name: 'offers_super_patch', methods: ['PATCH'])]
-    public function assignSuperSeller(Request $request, EntityManagerInterface $em): JsonResponse
+    public function assignSuperSeller(Request $request): JsonResponse
     {
-        $body = json_decode($request->getContent(), true);
-        if (!is_array($body)) {
-            return new JsonResponse(['error' => 'Invalid JSON payload'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $offerId = $body['offerId'] ?? null;
-        $superSellerId = $body['superSellerId'] ?? null;
-
-        if (!is_int($offerId) || !is_int($superSellerId)) {
-            return new JsonResponse(['error' => 'offerId and superSellerId are required (int)'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $offer = $em->find(Offer::class, $offerId);
-        if (!$offer) {
-            return new JsonResponse(['error' => 'Offer not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        $superSeller = $em->find(SuperSeller::class, $superSellerId);
-        if (!$superSeller) {
-            return new JsonResponse(['error' => 'SuperSeller not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        $offer->setSuperSeller($superSeller);
-        $em->flush();
-
-        return new JsonResponse($offer->toArray(), Response::HTTP_OK);
+        return $this->proxy('PATCH', '/offers-super', $request->getContent());
     }
 
     #[Route('', methods: ['POST'])]
     #[Route('/', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em): JsonResponse
+    public function create(Request $request): JsonResponse
     {
-        $body = json_decode($request->getContent(), true);
-        if (!is_array($body)) {
-            return new JsonResponse(['error' => 'Invalid JSON payload'], Response::HTTP_BAD_REQUEST);
+        return $this->proxy('POST', '/offers', $request->getContent());
+    }
+
+    private function proxy(string $method, string $path, ?string $body = null): JsonResponse
+    {
+        $url = $this->offersServiceUrl . $path;
+
+        $opts = [
+            'http' => [
+                'method' => $method,
+                'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
+                'ignore_errors' => true,
+                'timeout' => 10,
+            ],
+        ];
+
+        if ($body !== null) {
+            $opts['http']['content'] = $body;
         }
 
-        $title = $body['title'] ?? null;
-        $description = $body['description'] ?? null;
-        $price = $body['price'] ?? null;
+        $context = stream_context_create($opts);
+        $response = @file_get_contents($url, false, $context);
 
-        if (!is_string($title) || trim($title) === '') {
-            return new JsonResponse(['error' => 'Title is required'], Response::HTTP_BAD_REQUEST);
+        if ($response === false) {
+            $this->logger->error('Failed to proxy request to offers-service', [
+                'url' => $url,
+                'method' => $method,
+            ]);
+            return new JsonResponse(
+                ['error' => 'Offers service unavailable'],
+                Response::HTTP_BAD_GATEWAY
+            );
         }
 
-        if (!is_null($description) && !is_string($description)) {
-            return new JsonResponse(['error' => 'Description must be a string or null'], Response::HTTP_BAD_REQUEST);
+        $statusCode = $this->extractStatusCode($http_response_header ?? []);
+        $data = json_decode($response, true);
+
+        return new JsonResponse($data, $statusCode);
+    }
+
+    private function extractStatusCode(array $headers): int
+    {
+        foreach ($headers as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $header, $matches)) {
+                return (int) $matches[1];
+            }
         }
-
-        if (!is_numeric($price)) {
-            return new JsonResponse(['error' => 'Price must be numeric'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $offer = new Offer(trim($title), $description, (float) $price);
-
-        $em->persist($offer);
-        $em->flush();
-
-        return new JsonResponse($offer->toArray(), Response::HTTP_CREATED);
+        return Response::HTTP_BAD_GATEWAY;
     }
 }
