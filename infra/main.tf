@@ -106,6 +106,14 @@ import {
   to = google_cloud_run_v2_service.mini_allegro
 }
 
+# product-review-service ma osobny root Terraform (infra/product-review-service/),
+# więc nie możemy bezpośrednio odwołać się do jego zasobu przez referencję.
+# Zamiast tego używamy data source, który pobiera URI już zdeployowanego serwisu z GCP.
+data "google_cloud_run_v2_service" "product_review_service" {
+  name     = "product-review-service-dev"
+  location = var.region
+}
+
 resource "google_cloud_run_v2_service" "mini_allegro" {
   name     = var.service_name
   location = var.region
@@ -129,6 +137,11 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
       env {
         name  = "APP_ENV"
         value = "prod"
+      }
+
+      env {
+        name  = "PRODUCT_REVIEW_SERVICE_URL"
+        value = data.google_cloud_run_v2_service.product_review_service.uri
       }
     }
 
