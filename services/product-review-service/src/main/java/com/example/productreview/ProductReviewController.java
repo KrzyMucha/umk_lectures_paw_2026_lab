@@ -25,7 +25,7 @@ public class ProductReviewController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductReviewDto> show(@PathVariable int id) {
+    public ResponseEntity<ProductReviewDto> show(@PathVariable String id) {
         return repository.findById(id)
                 .map(ProductReviewDto::from)
                 .map(ResponseEntity::ok)
