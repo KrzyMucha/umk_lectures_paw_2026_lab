@@ -140,6 +140,11 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
       }
 
       env {
+        name  = "PURCHASE_SERVICE_URL"
+        value = google_cloud_run_v2_service.purchase_service.uri
+      }
+
+      env {
         name  = "PRODUCT_REVIEW_SERVICE_URL"
         value = data.google_cloud_run_v2_service.product_review_service.uri
       }

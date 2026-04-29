@@ -5,6 +5,7 @@ on:
     branches:
       - develop
     paths:
+      - "infra/**"
       - "infra/dev/**"
       - "services/symphony-monolith/**"
       - "integ-tests/**"
@@ -21,6 +22,7 @@ env:
   REPOSITORY: mini-allegro
   IMAGE: mini-allegro
   SERVICE_DEV: mini-allegro-dev
+  DEV_DB_INSTANCE_NAME: mini-allegro-db-dev
 
 jobs:
   validate-secrets:
@@ -258,7 +260,8 @@ jobs:
 
   promote-to-main:
     name: Auto-merge develop -> main
-    needs: integration-tests-dev
+    needs:
+      - integration-tests-dev
     runs-on: ubuntu-latest
 
     steps:
