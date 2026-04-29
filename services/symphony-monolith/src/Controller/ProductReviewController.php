@@ -26,7 +26,7 @@ class ProductReviewController extends AbstractController
 
         try {
             $response = $httpClient->request('GET', $serviceUrl . '/product-reviews', [
-                'timeout' => 5,
+                'timeout' => 30,
             ]);
             return new JsonResponse($response->toArray(), $response->getStatusCode());
         } catch (\Throwable $e) {
