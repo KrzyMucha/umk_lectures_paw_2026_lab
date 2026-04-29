@@ -14,11 +14,31 @@ provider "google" {
   region  = var.region
 }
 
+resource "google_storage_bucket" "offers_data" {
+  name                        = "${var.project}-offers-data-${var.environment}"
+  location                    = var.region
+  force_destroy               = false
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = true
+  }
+}
+
 resource "google_cloud_run_v2_service" "offers_service" {
   name     = var.service_name
   location = var.region
 
   template {
+    volumes {
+      name = "offers-storage"
+
+      gcs {
+        bucket    = google_storage_bucket.offers_data.name
+        read_only = false
+      }
+    }
+
     containers {
       image = var.image
 
@@ -37,6 +57,16 @@ resource "google_cloud_run_v2_service" "offers_service" {
       env {
         name  = "DATABASE_URL"
         value = var.database_url
+      }
+
+      env {
+        name  = "STORAGE_MOUNT_PATH"
+        value = var.storage_mount_path
+      }
+
+      volume_mounts {
+        name       = "offers-storage"
+        mount_path = var.storage_mount_path
       }
     }
   }

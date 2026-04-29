@@ -20,8 +20,6 @@ on:
         required: true
       TF_STATE_BUCKET:
         required: true
-      DATABASE_URL:
-        required: true
     outputs:
       offers_service_url:
         description: "Deployed offers-service Cloud Run URL"
@@ -107,16 +105,6 @@ jobs:
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
             -backend-config="prefix=offers-service/${{ inputs.environment }}"
 
-      - name: Prepare sanitized DATABASE_URL
-        id: dburl
-        env:
-          RAW_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          DB_URL="$RAW_DATABASE_URL"
-          DB_URL="$(printf '%s' "$DB_URL" | sed -E 's/([?&])(serverVersion|charset)=[^&]*/\1/g; s/\?&/\?/g; s/&&+/\&/g; s/[?\&]$//')"
-          echo "::add-mask::$DB_URL"
-          echo "value=$DB_URL" >> "$GITHUB_OUTPUT"
-
       - name: Terraform apply
         working-directory: infra/offers-service
         run: |
@@ -125,7 +113,8 @@ jobs:
             -auto-approve \
             -var="image=${{ needs.build.outputs.image_tag }}" \
             -var="service_name=${{ inputs.service_name }}" \
-            -var="database_url=${{ steps.dburl.outputs.value }}"
+            -var="environment=${{ inputs.environment }}" \
+            -var="database_url=/var/data/offers-data/offers.db"
 
   deploy:
     name: Deploy offers-service
@@ -147,6 +136,32 @@ jobs:
           service: ${{ inputs.service_name }}
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
+
+      - name: Run database migration
+        run: |
+          BUCKET="${{ env.PROJECT_ID }}-offers-data-${{ inputs.environment }}"
+
+          gcloud run jobs create ${{ inputs.service_name }}-migrate \
+            --image=${{ needs.build.outputs.image_tag }} \
+            --region=${{ env.REGION }} \
+            --set-env-vars="DATABASE_URL=/var/data/offers-data/offers.db" \
+            --args="migrate" \
+            --max-retries=0 \
+            --add-volume=name=offers-storage,type=cloud-storage,bucket=${BUCKET} \
+            --add-volume-mount=volume=offers-storage,mount-path=/var/data/offers-data \
+            2>/dev/null || \
+          gcloud run jobs update ${{ inputs.service_name }}-migrate \
+            --image=${{ needs.build.outputs.image_tag }} \
+            --region=${{ env.REGION }} \
+            --set-env-vars="DATABASE_URL=/var/data/offers-data/offers.db" \
+            --args="migrate" \
+            --max-retries=0 \
+            --add-volume=name=offers-storage,type=cloud-storage,bucket=${BUCKET} \
+            --add-volume-mount=volume=offers-storage,mount-path=/var/data/offers-data
+
+          gcloud run jobs execute ${{ inputs.service_name }}-migrate \
+            --region=${{ env.REGION }} \
+            --wait
 
       - name: Health-check (HTTP 200)
         run: |

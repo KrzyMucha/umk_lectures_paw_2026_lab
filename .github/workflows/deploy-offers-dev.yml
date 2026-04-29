@@ -21,4 +21,3 @@ jobs:
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
-      DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}

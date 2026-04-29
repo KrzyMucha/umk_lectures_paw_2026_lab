@@ -26,3 +26,15 @@ variable "database_url" {
   type        = string
   sensitive   = true
 }
+
+variable "environment" {
+  description = "Deployment environment (dev or prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "storage_mount_path" {
+  description = "Mount path for GCS volume inside the container"
+  type        = string
+  default     = "/var/data/offers-data"
+}
