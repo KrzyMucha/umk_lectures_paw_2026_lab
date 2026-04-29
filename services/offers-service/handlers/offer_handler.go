@@ -41,9 +41,10 @@ func (h *OfferHandler) GetOffers(c *gin.Context) {
 
 func (h *OfferHandler) CreateOffer(c *gin.Context) {
 	var body struct {
-		Title       *string  `json:"title"`
-		Description *string  `json:"description"`
-		Price       *float64 `json:"price"`
+		Title         *string  `json:"title"`
+		Description   *string  `json:"description"`
+		Price         *float64 `json:"price"`
+		SuperSellerID *int     `json:"superSellerId"`
 	}
 
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -62,9 +63,10 @@ func (h *OfferHandler) CreateOffer(c *gin.Context) {
 	}
 
 	offer := models.Offer{
-		Title:       strings.TrimSpace(*body.Title),
-		Description: body.Description,
-		Price:       *body.Price,
+		Title:         strings.TrimSpace(*body.Title),
+		Description:   body.Description,
+		Price:         *body.Price,
+		SuperSellerID: body.SuperSellerID,
 	}
 
 	if err := h.repo.Create(&offer); err != nil {
