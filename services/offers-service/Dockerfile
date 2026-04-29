@@ -11,4 +11,4 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /app/offers-service .
 EXPOSE 8082
-CMD ["./offers-service"]
+ENTRYPOINT ["./offers-service"]
