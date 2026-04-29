@@ -203,6 +203,13 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      - name: Resolve PRODUCT_REVIEW_SERVICE_URL
+        run: |
+          REVIEW_URL=$(gcloud run services describe product-review-service-dev \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "PRODUCT_REVIEW_SERVICE_URL=$REVIEW_URL" >> $GITHUB_ENV
+
       - name: Deploy to Cloud Run PROD
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -214,6 +221,7 @@ jobs:
             DATABASE_URL=${{ steps.dburl.outputs.value }}
             APP_SECRET=${{ secrets.APP_SECRET }}
             OFFERS_SERVICE_URL=${{ needs.deploy-offers-prod.outputs.offers_service_url }}
+            PRODUCT_REVIEW_SERVICE_URL=${{ env.PRODUCT_REVIEW_SERVICE_URL }}
 
       - name: PROD health-check (HTTP 200)
         run: |

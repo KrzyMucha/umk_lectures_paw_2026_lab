@@ -26,7 +26,7 @@ class ProductReviewController extends AbstractController
 
         try {
             $response = $httpClient->request('GET', $serviceUrl . '/product-reviews', [
-                'timeout' => 5,
+                'timeout' => 30,
             ]);
             return new JsonResponse($response->toArray(), $response->getStatusCode());
         } catch (\Throwable $e) {
@@ -36,7 +36,7 @@ class ProductReviewController extends AbstractController
 
     #[Route('/product-reviews', methods: ['POST'])]
     #[Route('/product-reviews/', methods: ['POST'])]
-    public function create(Request $request, ProductRepository $productRepo, EntityManagerInterface $em): JsonResponse
+    public function create(Request $request, ProductRepository $productRepo, HttpClientInterface $httpClient): JsonResponse
     {
         $body = json_decode($request->getContent(), true);
         if (!is_array($body)) {
@@ -69,16 +69,17 @@ class ProductReviewController extends AbstractController
             return new JsonResponse(['error' => 'AuthorName must be a string or null'], Response::HTTP_BAD_REQUEST);
         }
 
-        $review = new ProductReview();
-        $review->setProduct($product);
-        $review->setRating($rating);
-        $review->setComment($comment);
-        $review->setAuthorName($authorName);
+        $serviceUrl = $_ENV['PRODUCT_REVIEW_SERVICE_URL'] ?? '';
 
-        $em->persist($review);
-        $em->flush();
-
-        return new JsonResponse($review->toArray(), Response::HTTP_CREATED);
+        try {
+            $response = $httpClient->request('POST', $serviceUrl . '/product-reviews', [
+                'timeout' => 30,
+                'json'    => $body,
+            ]);
+            return new JsonResponse($response->toArray(), $response->getStatusCode());
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => 'product-review-service unavailable'], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
     #[Route('/reviews-super', methods: ['GET'])]

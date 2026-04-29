@@ -36,4 +36,11 @@ public class ProductReview {
     public String getAuthorName() { return authorName; }
     public Integer getOfferId() { return offerId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
+
+    public void setProductId(Integer productId) { this.productId = productId; }
+    public void setRating(Integer rating) { this.rating = rating; }
+    public void setComment(String comment) { this.comment = comment; }
+    public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public void setOfferId(Integer offerId) { this.offerId = offerId; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 }
