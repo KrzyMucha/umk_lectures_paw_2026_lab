@@ -8,9 +8,12 @@ on:
       - "infra/**"
       - "infra/dev/**"
       - "services/symphony-monolith/**"
+      - "services/product-review-service/**"
+      - "services/offers-service/**"
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
+      - ".github/workflows/deploy-offers-service.yml"
 
 permissions:
   contents: write
@@ -22,6 +25,7 @@ env:
   REPOSITORY: mini-allegro
   IMAGE: mini-allegro
   SERVICE_DEV: mini-allegro-dev
+  OFFERS_SERVICE_DEV: offers-service-dev
   DEV_DB_INSTANCE_NAME: mini-allegro-db-dev
 
 jobs:
@@ -142,9 +146,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy-offers-dev:
+    name: Deploy offers-service (DEV)
+    needs: terraform-dev
+    uses: ./.github/workflows/deploy-offers-service.yml
+    with:
+      environment: dev
+      service_name: offers-service-dev
+      image_tag_suffix: dev
+      sha: ${{ github.sha }}
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+
   deploy-dev:
     name: Deploy to DEV
-    needs: build-dev
+    needs: [build-dev, deploy-offers-dev]
     runs-on: ubuntu-latest
     environment: dev
 
@@ -180,6 +197,7 @@ jobs:
             APP_ENV=dev
             DATABASE_URL=${{ steps.dburl.outputs.value }}
             APP_SECRET=${{ secrets.APP_SECRET }}
+            OFFERS_SERVICE_URL=${{ needs.deploy-offers-dev.outputs.offers_service_url }}
             PRODUCT_REVIEW_SERVICE_URL=https://product-review-service-dev-sahzovzjgq-lm.a.run.app
 
       - name: DEV health-check (HTTP 200)

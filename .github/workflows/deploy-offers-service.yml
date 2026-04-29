@@ -1,0 +1,185 @@
+name: Deploy offers-service
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      service_name:
+        required: true
+        type: string
+      image_tag_suffix:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
+    secrets:
+      GCP_SA_KEY:
+        required: true
+      TF_STATE_BUCKET:
+        required: true
+    outputs:
+      offers_service_url:
+        description: "Deployed offers-service Cloud Run URL"
+        value: ${{ jobs.deploy.outputs.offers_service_url }}
+
+env:
+  PROJECT_ID: project-f5f4f6f0-acae-485b-a16
+  REGION: europe-central2
+  REGISTRY: europe-central2-docker.pkg.dev
+  REPOSITORY: mini-allegro
+  OFFERS_IMAGE: offers-service
+
+jobs:
+  build:
+    name: Build & Push offers-service image
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Generate image tag
+        id: meta
+        run: |
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.OFFERS_IMAGE }}:${{ inputs.sha }}-${{ inputs.image_tag_suffix }}"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push offers-service image (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: services/offers-service
+          file: services/offers-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  terraform:
+    name: Terraform apply (offers-service infra)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Ensure Terraform state bucket exists
+        run: |
+          gcloud storage buckets describe gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} >/dev/null 2>&1 || \
+          gcloud storage buckets create gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} --location=${{ env.REGION }}
+
+      - name: Terraform init
+        working-directory: infra/offers-service
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=offers-service/${{ inputs.environment }}"
+
+      - name: Terraform apply
+        working-directory: infra/offers-service
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            -var="image=${{ needs.build.outputs.image_tag }}" \
+            -var="service_name=${{ inputs.service_name }}" \
+            -var="environment=${{ inputs.environment }}" \
+            -var="database_url=/var/data/offers-data/offers.db"
+
+  deploy:
+    name: Deploy offers-service
+    needs: [build, terraform]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      offers_service_url: ${{ steps.url.outputs.offers_service_url }}
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy offers-service to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ inputs.service_name }}
+          region: ${{ env.REGION }}
+          image: ${{ needs.build.outputs.image_tag }}
+
+      - name: Run database migration
+        run: |
+          BUCKET="${{ env.PROJECT_ID }}-offers-data-${{ inputs.environment }}"
+
+          gcloud run jobs create ${{ inputs.service_name }}-migrate \
+            --image=${{ needs.build.outputs.image_tag }} \
+            --region=${{ env.REGION }} \
+            --set-env-vars="DATABASE_URL=/var/data/offers-data/offers.db" \
+            --args="migrate" \
+            --max-retries=0 \
+            --add-volume=name=offers-storage,type=cloud-storage,bucket=${BUCKET} \
+            --add-volume-mount=volume=offers-storage,mount-path=/var/data/offers-data \
+            2>/dev/null || \
+          gcloud run jobs update ${{ inputs.service_name }}-migrate \
+            --image=${{ needs.build.outputs.image_tag }} \
+            --region=${{ env.REGION }} \
+            --set-env-vars="DATABASE_URL=/var/data/offers-data/offers.db" \
+            --args="migrate" \
+            --max-retries=0 \
+            --add-volume=name=offers-storage,type=cloud-storage,bucket=${BUCKET} \
+            --add-volume-mount=volume=offers-storage,mount-path=/var/data/offers-data
+
+          gcloud run jobs execute ${{ inputs.service_name }}-migrate \
+            --region=${{ env.REGION }} \
+            --wait
+
+      - name: Health-check (HTTP 200)
+        run: |
+          URL=$(gcloud run services describe ${{ inputs.service_name }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
+          echo "Offers service URL: $URL"
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed! Got HTTP $STATUS"
+            exit 1
+          fi
+
+      - name: Output service URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ${{ inputs.service_name }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "offers_service_url=${URL}" >> "$GITHUB_OUTPUT"
