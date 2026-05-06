@@ -25,3 +25,14 @@ variable "offer_service_url" {
   description = "Upstream service URL used by the monolith"
   type        = string
 }
+
+variable "purchase_service_name" {
+  description = "Cloud Run service name for purchase"
+  type        = string
+  default     = "symfony-purchase"
+}
+
+variable "purchase_service_url" {
+  description = "Upstream purchase service URL used by the monolith"
+  type        = string
+}
