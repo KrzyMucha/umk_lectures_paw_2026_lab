@@ -27,3 +27,22 @@ variable "db_name" {
   type        = string
   default     = "mini_allegro_prod"
 }
+
+variable "neo4j_initial_password" {
+  description = "Initial password for Neo4J admin user"
+  type        = string
+  sensitive   = true
+}
+
+variable "neo4j_username" {
+  description = "Neo4J username"
+  type        = string
+  default     = "neo4j"
+  sensitive   = true
+}
+
+variable "neo4j_password" {
+  description = "Neo4J password for user-service"
+  type        = string
+  sensitive   = true
+}
