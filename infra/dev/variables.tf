@@ -28,12 +28,6 @@ variable "db_name" {
   default     = "mini_allegro_dev"
 }
 
-variable "neo4j_initial_password" {
-  description = "Initial password for Neo4J admin user"
-  type        = string
-  sensitive   = true
-}
-
 variable "neo4j_uri" {
   description = "Neo4J connection URI for user-service"
   type        = string
