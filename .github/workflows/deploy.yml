@@ -7,6 +7,7 @@ on:
     paths:
       - "infra/dev/**"
       - "services/symphony-monolith/**"
+      - "services/user-service/**"
       - "integ-tests/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/deploy-prod.yml"
@@ -34,6 +35,7 @@ jobs:
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
           DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
           APP_SECRET: ${{ secrets.APP_SECRET }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
         run: |
           missing=0
 
@@ -57,6 +59,11 @@ jobs:
             missing=1
           fi
 
+          if [ -z "$NEO4J_PASSWORD" ]; then
+            echo "Missing required secret: NEO4J_PASSWORD"
+            missing=1
+          fi
+
           if printf '%s' "$DEV_DATABASE_URL" | grep -Eq '(^|[?&])serverVersion=([&]|$)'; then
             echo "Invalid DEV_DATABASE_URL: serverVersion is empty"
             missing=1
@@ -68,7 +75,7 @@ jobs:
 
   terraform-dev:
     name: Terraform apply (DEV infra)
-    needs: validate-secrets
+    needs: [validate-secrets, build-user-service-dev]
     runs-on: ubuntu-latest
     environment: dev
 
@@ -99,6 +106,9 @@ jobs:
 
       - name: Terraform apply (DEV)
         working-directory: infra/dev
+        env:
+          TF_VAR_neo4j_initial_password: ${{ secrets.NEO4J_PASSWORD }}
+          TF_VAR_neo4j_password: ${{ secrets.NEO4J_PASSWORD }}
         run: terraform apply -input=false -auto-approve
 
   build-dev:
@@ -135,6 +145,43 @@ jobs:
           context: services/symphony-monolith
           file: services/symphony-monolith/docker/Dockerfile
           target: prod
+          push: true
+          tags: ${{ steps.meta.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-user-service-dev:
+    name: Build & Push user-service Docker image (DEV)
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Generate user-service DEV image tag
+        id: meta
+        run: |
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/user-service:${{ github.sha }}-dev"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push user-service Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/user-service
+          file: services/user-service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.image_tag }}
           cache-from: type=gha

@@ -24,6 +24,7 @@ Wklej do Copilota:
 > Stwórz projekt Spring Boot w katalogu `services/[encja]-service/`.
 >
 > Wymagania:
+>
 > - Java 21, Gradle (Kotlin DSL — `build.gradle.kts`)
 > - Spring Boot 3.3+
 > - Zależności: `spring-boot-starter-web`, `spring-boot-starter-jdbc`
@@ -44,6 +45,7 @@ Wklej do Copilota:
 > ```
 >
 > W `application.properties`:
+>
 > ```
 > server.port=${PORT:8080}
 > ```
@@ -63,6 +65,7 @@ Wklej do Copilota:
 >
 > 1. Klasę `[Encja].java` — POJO z polami identycznymi jak w odpowiedzi monolitu.
 >    Aktualny format JSON z monolitu:
+>
 >    ```json
 >    [wklej output z: curl -s http://localhost:8080/[endpoint] | python3 -m json.tool]
 >    ```
@@ -82,22 +85,64 @@ Wklej do Copilota:
 
 Wklej do Copilota:
 
-> Stwórz `Dockerfile` w `services/[encja]-service/` dla projektu Spring Boot z Gradle.
->
-> Wymagania:
-> - Multi-stage build
-> - Stage 1 (`builder`): `eclipse-temurin:21-jdk-alpine`, kopiuj źródła, uruchom `./gradlew bootJar`
-> - Stage 2 (`runtime`): `eclipse-temurin:21-jre-alpine`, kopiuj JAR z buildera
-> - Entrypoint: `java -jar app.jar`
-> - Nie kopiuj `.gradle/` ani `build/` — dodaj `.dockerignore`
->
-> Stwórz też `.dockerignore`:
-> ```
-> .gradle/
-> build/
-> .idea/
-> *.iml
-> ```
+> Stwórz `Dockerfile` w `services/[encja]-service/` dla projektu Compacted conversation# Podsumowanie: feat/users-service-with-db
+
+## ✅ Wykonane
+
+- **Infrastructure-as-Code (Terraform)**
+
+  - Konfiguracja Neo4j dla dev i prod (neo4j.tf, neo4j.tf)
+  - Skrypty inicjalizacyjne Neo4j (`neo4j-startup.sh` w dev i prod)
+  - Konfiguracja user-service dla dev i prod (user-service.tf, user-service.tf)
+  - Zaktualizowane zmienne w variables.tf i variables.tf
+
+- **Implementacja User-Service**
+
+  - Pełna struktura Java/Spring Boot microservice w user-service
+  - Konfiguracja Docker Compose dla user-service
+  - Aktualizacja deployment pipeline (deploy.yml)
+
+- **Docker Infrastructure**
+  - Kontenery Neo4j i user-service pomyślnie uruchomione
+  - Oba kontenery w stanie "healthy/started"
+  - Połączenia sieciowe skonfigurowane
+
+## ⚠️ Problemy do rozwiązania
+
+- **Exit code 1** w terminalu user-service - brak diagnostyki przyczyny
+  - Możliwe przyczyny: błędy testów, problemy z uruchomieniem Spring Boot, brak połączenia z Neo4j
+  - Potrzebne: `docker logs user-service` do analizy
+
+## 📋 Do zrobienia
+
+1. **Debugowanie user-service** - sprawdzić logi, znaleźć błąd exit code 1
+2. **Walidacja funkcjonalności** - testy API endpoints i operacji w bazie danych
+3. **Git commit** - scommitować wszystkie nowe pliki infrastruktury i implementacji serwisu
+4. **Testy integracyjne** - sprawdzić integ-tests czy działają z nową architekturą
+
+## 📌 Kontekst
+
+- Branch: `feat/users-service-with-db`
+- Architektura: PHP Symphony (główna) + Java Spring Boot (user-service)
+- Baza user-service: Neo4j
+- Środowisko: Docker Compose (dev), Terraform (dev/prod)
+- Ostatnie: Docker kontenery ruszają, ale user-service ma exit code 1Spring Boot z Gradle.
+  > Wymagania:
+  >
+  > - Multi-stage build
+  > - Stage 1 (`builder`): `eclipse-temurin:21-jdk-alpine`, kopiuj źródła, uruchom `./gradlew bootJar`
+  > - Stage 2 (`runtime`): `eclipse-temurin:21-jre-alpine`, kopiuj JAR z buildera
+  > - Entrypoint: `java -jar app.jar`
+  > - Nie kopiuj `.gradle/` ani `build/` — dodaj `.dockerignore`
+  >
+  > Stwórz też `.dockerignore`:
+  >
+  > ```
+  > .gradle/
+  > build/
+  > .idea/
+  > *.iml
+  > ```
 
 Gotowy Dockerfile dla odniesienia (jeśli Copilot wygeneruje coś dziwnego):
 
@@ -189,6 +234,7 @@ Cloud Run sprawdza czy serwis żyje robiąc `GET /`. Jeśli zwróci 404, Cloud R
 Wklej do Copilota:
 
 > Dodaj w Spring Boot endpoint health check:
+>
 > - `GET /` — zwraca `{"status": "ok", "service": "[encja]-service"}` z HTTP 200
 >
 > Może to być osobny `HealthController` albo dodatkowa metoda w istniejącym kontrolerze.
@@ -226,11 +272,14 @@ Wklej do Copilota:
 > Mam już zależności `spring-boot-starter-jdbc` i `postgresql` w `build.gradle.kts`.
 >
 > 1. W `application.properties` skonfiguruj datasource przez zmienną `DATABASE_URL`:
+>
 >    ```properties
 >    spring.datasource.url=${DATABASE_URL:}
 >    ```
+>
 >    Spring Boot powinien parsować standardowy format `postgresql://user:pass@host:port/dbname`.
 >    Jeśli Spring nie parsuje tego formatu, użyj osobnych zmiennych:
+>
 >    ```properties
 >    spring.datasource.url=jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:paw}
 >    spring.datasource.username=${DB_USER:postgres}
@@ -238,6 +287,7 @@ Wklej do Copilota:
 >    ```
 >
 > 2. Stwórz klasę `[Encja]Repository.java` która używa `JdbcTemplate`:
+>
 >    - metoda `findAll()` — `SELECT * FROM [tabela]`, mapuje wiersze na `[Encja]`
 >    - metoda `findById(int id)` — `SELECT * FROM [tabela] WHERE id = ?`
 >
@@ -246,6 +296,7 @@ Wklej do Copilota:
 >    z komunikatem "Database not configured".
 >
 > Schemat tabeli (skopiuj z migracji monolitu lub uruchom):
+>
 > ```
 > [wklej output z: psql $DATABASE_URL -c "\d [tabela]"]
 > ```
@@ -255,6 +306,7 @@ Wklej do Copilota:
 Uwaga: Spring Boot standardowo oczekuje `jdbc:postgresql://` a nie `postgresql://`. Są dwa podejścia:
 
 **Podejście A** — osobne zmienne (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`):
+
 ```bash
 DATABASE_URL nie jest używany, zamiast tego:
 DB_HOST=host.docker.internal DB_PORT=5433 DB_NAME=paw DB_USER=postgres DB_PASSWORD=haslo ./run-local.sh
@@ -293,6 +345,7 @@ Wklej do Copilota:
 > Monolit Symfony łączy się z Cloud SQL przez Unix socket (Cloud SQL Auth Proxy wbudowany w Cloud Run).
 >
 > Dla Spring Boot na Cloud Run potrzebuję:
+>
 > 1. W Terraform: dodaj Cloud SQL instance connection w konfiguracji Cloud Run
 >    (annotation `run.googleapis.com/cloudsql-instances` lub blok `cloud_sql_instance` w template)
 > 2. Spring Boot łączy się do Cloud SQL przez socket. JDBC URL wygląda tak:
@@ -332,6 +385,7 @@ Wróć do głównego zadania (`zadanie_7_1.md`, Krok 4). Prompty są generyczne 
 ### `./gradlew: Permission denied` w Dockerze
 
 Dodaj na początku Dockerfile:
+
 ```dockerfile
 RUN chmod +x gradlew
 ```
@@ -353,6 +407,7 @@ Spring Boot oczekuje `jdbc:postgresql://`. Rozwiązanie: użyj osobnych zmiennyc
 ### Cold start trwa >10 sekund
 
 Dodaj flagi JVM w Dockerfile:
+
 ```dockerfile
 ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xss512k", "-Xmx256m", "-jar", "app.jar"]
 ```
