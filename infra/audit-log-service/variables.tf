@@ -10,19 +10,19 @@ variable "region" {
   default     = "europe-central2"
 }
 
+variable "zone" {
+  description = "GCP Zone"
+  type        = string
+  default     = "europe-central2-a"
+}
+
 variable "service_name" {
   description = "Cloud Run service name"
   type        = string
-  default     = "products-service-dev"
+  default     = "audit-log-service"
 }
 
 variable "image" {
   description = "Docker image to deploy"
   type        = string
-}
-
-variable "database_url" {
-  description = "PostgreSQL connection URL"
-  type        = string
-  sensitive   = true
 }

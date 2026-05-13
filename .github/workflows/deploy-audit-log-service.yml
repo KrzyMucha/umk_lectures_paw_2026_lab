@@ -1,21 +1,28 @@
-name: Deploy product-review-service DEV
+name: Deploy audit-log-service DEV
 
 on:
   push:
     branches:
       - develop
     paths:
-      - "services/product-review-service/**"
-      - "infra/product-review-service/**"
-      - ".github/workflows/deploy-product-review-service.yml"
+      - "services/audit-log-service/**"
+      - "infra/audit-log-service/**"
+      - ".github/workflows/deploy-audit-log-service.yml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "services/audit-log-service/**"
+      - "infra/audit-log-service/**"
+      - ".github/workflows/deploy-audit-log-service.yml"
 
 env:
   PROJECT_ID: paw-2026-496213
   REGION: europe-central2
   REGISTRY: europe-central2-docker.pkg.dev
   REPOSITORY: mini-allegro
-  IMAGE: product-review-service
-  SERVICE_DEV: product-review-service-dev
+  IMAGE: audit-log-service
+  SERVICE_DEV: audit-log-service
 
 jobs:
   validate-secrets:
@@ -27,22 +34,13 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
-          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
         run: |
-          missing=0
           if [ -z "$GCP_SA_KEY" ]; then
             echo "Missing required secret: GCP_SA_KEY"
-            missing=1
+            exit 1
           fi
           if [ -z "$TF_STATE_BUCKET" ]; then
             echo "Missing required secret: TF_STATE_BUCKET"
-            missing=1
-          fi
-          if [ -z "$DEV_DATABASE_URL" ]; then
-            echo "Missing required secret: DEV_DATABASE_URL"
-            missing=1
-          fi
-          if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
@@ -77,15 +75,15 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: services/product-review-service
-          file: services/product-review-service/Dockerfile
+          context: services/audit-log-service
+          file: services/audit-log-service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  terraform:
-    name: Terraform apply (product-review-service infra)
+  deploy:
+    name: Deploy infrastructure and service
     needs: build
     runs-on: ubuntu-latest
     environment: dev
@@ -99,59 +97,69 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Set up Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Ensure Terraform state bucket exists
-        run: |
-          gcloud storage buckets describe gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} >/dev/null 2>&1 || \
-          gcloud storage buckets create gs://${{ secrets.TF_STATE_BUCKET }} --project=${{ env.PROJECT_ID }} --location=${{ env.REGION }}
-
       - name: Terraform init
-        working-directory: infra/product-review-service
+        working-directory: infra/audit-log-service
         run: |
           terraform init \
-            -input=false \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="prefix=product-review-service/dev"
+            -backend-config="prefix=audit-log-service"
 
       - name: Terraform apply
-        working-directory: infra/product-review-service
+        working-directory: infra/audit-log-service
         run: |
-          terraform apply \
-            -input=false \
-            -auto-approve \
-            -var="image=${{ needs.build.outputs.image_tag }}" \
-            -var="database_url=${{ secrets.DEV_DATABASE_URL }}"
+          terraform apply -auto-approve \
+            -var="image=${{ needs.build.outputs.image_tag }}"
 
-  deploy:
-    name: Deploy to Cloud Run DEV
-    needs: [build, terraform]
+      - name: Health check GET /health
+        id: health
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_DEV }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "service_url=${URL}" >> $GITHUB_OUTPUT
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed! Got HTTP $STATUS"
+            exit 1
+          fi
+          echo "audit-log-service is healthy"
+
+  integ-tests:
+    name: Integration tests
+    needs: deploy
     runs-on: ubuntu-latest
     environment: dev
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Deploy to Cloud Run DEV
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE_DEV }}
-          region: ${{ env.REGION }}
-          image: ${{ needs.build.outputs.image_tag }}
-
-      - name: Health check GET /product-reviews
+      - name: Get service URL
+        id: url
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_DEV }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
-          echo "DEV URL: $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/product-reviews")
-          if [ "$STATUS" != "200" ]; then
-            echo "Health check failed! Got HTTP $STATUS"
-            exit 1
-          fi
-          echo "product-review-service is healthy"
+          echo "service_url=${URL}" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest --quiet
+
+      - name: Run integration tests
+        working-directory: integ-tests
+        env:
+          AUDIT_LOG_SERVICE_URL: ${{ steps.url.outputs.service_url }}
+        run: pytest test_audit_logs.py -v
