@@ -17,3 +17,8 @@ output "purchase_artifact_registry_repository" {
   description = "Artifact Registry repository URL for purchase"
   value       = "${var.region}-docker.pkg.dev/${var.project}/${google_artifact_registry_repository.symfony_purchase.repository_id}"
 }
+
+output "purchase_app_service_url" {
+  description = "URL of the deployed purchase Flask Cloud Run service"
+  value       = google_cloud_run_v2_service.purchase_service.uri
+}
