@@ -2,18 +2,28 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"offers-service/models"
+	"offers-service/pubsub"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
 )
+
+type MockPublisher struct {
+	mock.Mock
+}
+
+func (m *MockPublisher) Publish(ctx context.Context, msg pubsub.ServiceLog) {
+	m.Called(ctx, msg)
+}
 
 type MockDB struct {
 	mock.Mock
@@ -80,7 +90,7 @@ func TestGetOffers_Empty(t *testing.T) {
 	mockDB := new(MockDB)
 	mockDB.On("FindAll", mock.Anything).Return(nil, nil)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()
@@ -104,7 +114,7 @@ func TestGetOffers_ReturnsSeedData(t *testing.T) {
 		}
 	}, nil)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()
@@ -123,7 +133,7 @@ func TestGetOffers_DBError(t *testing.T) {
 	mockDB := new(MockDB)
 	mockDB.On("FindAll", mock.Anything).Return(nil, gorm.ErrInvalidDB)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()
@@ -141,8 +151,12 @@ func TestCreateOffer_Success(t *testing.T) {
 	mockDB.On("Create", mock.Anything).Return(func(o *models.Offer) {
 		o.ID = 1
 	}, nil)
+	mockPub := new(MockPublisher)
+	mockPub.On("Publish", mock.Anything, mock.MatchedBy(func(msg pubsub.ServiceLog) bool {
+		return msg.Entity == "offer" && msg.Operation == "CREATE" && msg.Endpoint == "/offers"
+	})).Return()
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, mockPub)
 	r := setupRouter(h)
 
 	body := `{"title":"New Offer","description":"A nice offer","price":49.99}`
@@ -158,6 +172,7 @@ func TestCreateOffer_Success(t *testing.T) {
 	assert.Equal(t, 49.99, offer.Price)
 	assert.Equal(t, 1, offer.ID)
 	mockDB.AssertExpectations(t)
+	mockPub.AssertExpectations(t)
 }
 
 func TestCreateOffer_TrimTitle(t *testing.T) {
@@ -166,7 +181,7 @@ func TestCreateOffer_TrimTitle(t *testing.T) {
 		return o.Title == "Padded Title"
 	})).Return(func(o *models.Offer) { o.ID = 1 }, nil)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"title":"  Padded Title  ","price":5.0}`
@@ -184,7 +199,7 @@ func TestCreateOffer_TrimTitle(t *testing.T) {
 
 func TestCreateOffer_MissingTitle(t *testing.T) {
 	mockDB := new(MockDB)
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"description":"no title","price":10.0}`
@@ -198,7 +213,7 @@ func TestCreateOffer_MissingTitle(t *testing.T) {
 
 func TestCreateOffer_EmptyTitle(t *testing.T) {
 	mockDB := new(MockDB)
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"title":"   ","price":10.0}`
@@ -212,7 +227,7 @@ func TestCreateOffer_EmptyTitle(t *testing.T) {
 
 func TestCreateOffer_MissingPrice(t *testing.T) {
 	mockDB := new(MockDB)
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"title":"No Price Offer"}`
@@ -226,7 +241,7 @@ func TestCreateOffer_MissingPrice(t *testing.T) {
 
 func TestCreateOffer_InvalidJSON(t *testing.T) {
 	mockDB := new(MockDB)
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()
@@ -241,7 +256,7 @@ func TestCreateOffer_DBError(t *testing.T) {
 	mockDB := new(MockDB)
 	mockDB.On("Create", mock.Anything).Return(nil, gorm.ErrInvalidDB)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"title":"Fail Offer","price":10.0}`
@@ -265,7 +280,7 @@ func TestGetSuperOffers_FiltersCorrectly(t *testing.T) {
 		}
 	}, nil)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()
@@ -284,7 +299,7 @@ func TestGetSuperOffers_EmptyWhenNone(t *testing.T) {
 	mockDB := new(MockDB)
 	mockDB.On("FindSuperOffers", mock.Anything).Return(nil, nil)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()
@@ -311,8 +326,12 @@ func TestAssignSuperSeller_Success(t *testing.T) {
 		s.ID = 1
 	}, nil)
 	mockDB.On("Save", mock.Anything).Return(nil)
+	mockPub := new(MockPublisher)
+	mockPub.On("Publish", mock.Anything, mock.MatchedBy(func(msg pubsub.ServiceLog) bool {
+		return msg.Entity == "offer" && msg.Operation == "UPDATE" && msg.Endpoint == "/offers-super"
+	})).Return()
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, mockPub)
 	r := setupRouter(h)
 
 	body := `{"offerId":1,"superSellerId":1}`
@@ -327,13 +346,14 @@ func TestAssignSuperSeller_Success(t *testing.T) {
 	assert.NotNil(t, offer.SuperSellerID)
 	assert.Equal(t, 1, *offer.SuperSellerID)
 	mockDB.AssertExpectations(t)
+	mockPub.AssertExpectations(t)
 }
 
 func TestAssignSuperSeller_OfferNotFound(t *testing.T) {
 	mockDB := new(MockDB)
 	mockDB.On("FindOffer", 999, mock.Anything).Return(nil, gorm.ErrRecordNotFound)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"offerId":999,"superSellerId":1}`
@@ -355,7 +375,7 @@ func TestAssignSuperSeller_SellerNotFound(t *testing.T) {
 	}, nil)
 	mockDB.On("FindSuperSeller", 999, mock.Anything).Return(nil, gorm.ErrRecordNotFound)
 
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"offerId":1,"superSellerId":999}`
@@ -370,7 +390,7 @@ func TestAssignSuperSeller_SellerNotFound(t *testing.T) {
 
 func TestAssignSuperSeller_MissingFields(t *testing.T) {
 	mockDB := new(MockDB)
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	body := `{"offerId":1}`
@@ -384,7 +404,7 @@ func TestAssignSuperSeller_MissingFields(t *testing.T) {
 
 func TestAssignSuperSeller_InvalidJSON(t *testing.T) {
 	mockDB := new(MockDB)
-	h := NewOfferHandler(mockDB)
+	h := NewOfferHandler(mockDB, pubsub.NoopPublisher{})
 	r := setupRouter(h)
 
 	w := httptest.NewRecorder()

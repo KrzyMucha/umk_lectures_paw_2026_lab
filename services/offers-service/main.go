@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	"offers-service/handlers"
 	"offers-service/migrations"
+	"offers-service/pubsub"
 	"offers-service/repository"
 
 	"github.com/gin-gonic/gin"
@@ -46,8 +48,25 @@ func main() {
 		log.Fatalf("startup migration failed: %v", err)
 	}
 
+	var publisher pubsub.Publisher
+	if topic := os.Getenv("PUBSUB_TOPIC"); topic != "" {
+		projectID := os.Getenv("GCP_PROJECT_ID")
+		if projectID == "" {
+			log.Fatal("GCP_PROJECT_ID is required when PUBSUB_TOPIC is set")
+		}
+		p, err := pubsub.NewGCPPublisher(context.Background(), projectID, topic)
+		if err != nil {
+			log.Fatalf("failed to create pubsub publisher: %v", err)
+		}
+		publisher = p
+		log.Printf("pubsub: publishing to topic %s", topic)
+	} else {
+		publisher = pubsub.NoopPublisher{}
+		log.Println("pubsub: PUBSUB_TOPIC not set, publishing disabled")
+	}
+
 	repo := repository.NewOfferRepository(db)
-	offerHandler := handlers.NewOfferHandler(repo)
+	offerHandler := handlers.NewOfferHandler(repo, publisher)
 
 	r := gin.Default()
 

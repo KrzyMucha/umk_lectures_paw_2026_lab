@@ -136,6 +136,9 @@ jobs:
           service: ${{ inputs.service_name }}
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
+          env_vars: |
+            PUBSUB_TOPIC=mini-allegro-service-logs
+            GCP_PROJECT_ID=${{ env.PROJECT_ID }}
 
       - name: Run database migration
         run: |

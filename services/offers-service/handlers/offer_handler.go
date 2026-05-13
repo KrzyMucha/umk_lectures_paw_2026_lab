@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"offers-service/models"
+	"offers-service/pubsub"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,11 +23,12 @@ type OfferRepository interface {
 }
 
 type OfferHandler struct {
-	repo OfferRepository
+	repo      OfferRepository
+	publisher pubsub.Publisher
 }
 
-func NewOfferHandler(repo OfferRepository) *OfferHandler {
-	return &OfferHandler{repo: repo}
+func NewOfferHandler(repo OfferRepository, publisher pubsub.Publisher) *OfferHandler {
+	return &OfferHandler{repo: repo, publisher: publisher}
 }
 
 func (h *OfferHandler) GetOffers(c *gin.Context) {
@@ -75,6 +79,16 @@ func (h *OfferHandler) CreateOffer(c *gin.Context) {
 		return
 	}
 
+	if payload, err := json.Marshal(offer); err == nil {
+		h.publisher.Publish(c.Request.Context(), pubsub.ServiceLog{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Entity:    "offer",
+			Operation: "CREATE",
+			Payload:   string(payload),
+			Endpoint:  "/offers",
+		})
+	}
+
 	c.JSON(http.StatusCreated, offer)
 }
 
@@ -122,6 +136,16 @@ func (h *OfferHandler) AssignSuperSeller(c *gin.Context) {
 		log.Printf("assignSuperSeller error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
+	}
+
+	if payload, err := json.Marshal(offer); err == nil {
+		h.publisher.Publish(c.Request.Context(), pubsub.ServiceLog{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Entity:    "offer",
+			Operation: "UPDATE",
+			Payload:   string(payload),
+			Endpoint:  "/offers-super",
+		})
 	}
 
 	c.JSON(http.StatusOK, offer)
