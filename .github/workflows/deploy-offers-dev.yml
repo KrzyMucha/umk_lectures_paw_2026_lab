@@ -1,0 +1,23 @@
+name: Deploy offers-service DEV
+
+on:
+  push:
+    branches:
+      - feat/offers-golang
+    paths:
+      - "services/offers-service/**"
+      - "infra/offers-service/**"
+      - ".github/workflows/deploy-offers-dev.yml"
+      - ".github/workflows/deploy-offers-service.yml"
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-offers-service.yml
+    with:
+      environment: dev
+      service_name: offers-service-dev
+      image_tag_suffix: dev
+      sha: ${{ github.sha }}
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
