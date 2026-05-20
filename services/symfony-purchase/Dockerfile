@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1
+FROM dunglas/frankenphp:php8.3-alpine AS base
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+# --- prod stage ---
+FROM base AS prod
+
+ENV APP_ENV=prod
+
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
+    printf "%s\n" \
+        "opcache.enable=1" \
+        "opcache.memory_consumption=128" \
+        "opcache.max_accelerated_files=10000" \
+        "variables_order=EGPCS" \
+    > "$PHP_INI_DIR/conf.d/opcache.ini"
+
+COPY composer.json composer.lock* ./
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --no-dev --no-scripts --no-autoloader
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer dump-autoload --optimize --classmap-authoritative
+
+EXPOSE 8080
+
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t public"]
