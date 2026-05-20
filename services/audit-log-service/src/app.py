@@ -6,6 +6,8 @@ from typing import Any
 
 from elasticsearch import Elasticsearch, ConnectionError, TransportError
 from flask import Flask, jsonify, request
+from google.cloud import compute_v1
+from google.api_core.exceptions import GoogleAPICallError
 
 app = Flask(__name__)
 
@@ -18,9 +20,27 @@ INDEX = "audit_logs"
 
 es = Elasticsearch(os.getenv("ELASTICSEARCH_URL", "http://localhost:9200"))
 
+GCP_PROJECT = os.getenv("GCP_PROJECT", "")
+ES_VM_NAME = os.getenv("ELASTICSEARCH_VM_NAME", "elasticsearch-vm")
+ES_VM_ZONE = os.getenv("ELASTICSEARCH_VM_ZONE", "europe-central2-a")
+
 
 def _json_log(message: str, **fields: Any) -> None:
     logger.info(json.dumps({"message": message, **fields}, ensure_ascii=True))
+
+
+def _start_elasticsearch_vm() -> bool:
+    if not GCP_PROJECT:
+        _json_log("vm auto-start skipped", reason="GCP_PROJECT not set")
+        return False
+    try:
+        client = compute_v1.InstancesClient()
+        operation = client.start(project=GCP_PROJECT, zone=ES_VM_ZONE, instance=ES_VM_NAME)
+        _json_log("vm start requested", vm=ES_VM_NAME, zone=ES_VM_ZONE, operation=operation.name)
+        return True
+    except GoogleAPICallError as e:
+        _json_log("vm start failed", vm=ES_VM_NAME, error=str(e))
+        return False
 
 
 def _ensure_index() -> None:
@@ -40,6 +60,12 @@ def _ensure_index() -> None:
 
 
 def _es_unavailable() -> Any:
+    started = _start_elasticsearch_vm()
+    if started:
+        _json_log("elasticsearch unavailable, vm start triggered")
+        return jsonify({
+            "error": "Elasticsearch is unavailable. VM is starting — retry in ~3 minutes."
+        }), 503
     _json_log("elasticsearch unavailable")
     return jsonify({"error": "Elasticsearch is unavailable. The VM may be stopped."}), 503
 

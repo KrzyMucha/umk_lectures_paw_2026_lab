@@ -135,6 +135,19 @@ resource "google_compute_firewall" "elasticsearch" {
   depends_on = [google_project_service.compute]
 }
 
+# --- Service Account dla Cloud Run ---
+
+resource "google_service_account" "audit_log_sa" {
+  account_id   = "audit-log-service"
+  display_name = "Audit Log Service"
+}
+
+resource "google_project_iam_member" "audit_log_compute_admin" {
+  project = var.project
+  role    = "roles/compute.instanceAdmin.v1"
+  member  = "serviceAccount:${google_service_account.audit_log_sa.email}"
+}
+
 # --- Cloud Run: audit-log-service ---
 
 resource "google_cloud_run_v2_service" "audit_log_service" {
@@ -142,6 +155,8 @@ resource "google_cloud_run_v2_service" "audit_log_service" {
   location = var.region
 
   template {
+    service_account = google_service_account.audit_log_sa.email
+
     containers {
       image = var.image
 
@@ -159,6 +174,21 @@ resource "google_cloud_run_v2_service" "audit_log_service" {
       env {
         name  = "ELASTICSEARCH_URL"
         value = "http://${google_compute_instance.elasticsearch.network_interface[0].access_config[0].nat_ip}:9200"
+      }
+
+      env {
+        name  = "GCP_PROJECT"
+        value = var.project
+      }
+
+      env {
+        name  = "ELASTICSEARCH_VM_NAME"
+        value = google_compute_instance.elasticsearch.name
+      }
+
+      env {
+        name  = "ELASTICSEARCH_VM_ZONE"
+        value = var.zone
       }
     }
   }
