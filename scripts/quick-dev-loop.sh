@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-PROJECT_ID="project-f5f4f6f0-acae-485b-a16"
+PROJECT_ID="paw-2026-496213"
 REGION="europe-central2"
 REPOSITORY="mini-allegro"
 IMAGE_NAME="mini-allegro"
@@ -30,7 +30,7 @@ Description:
   5) Check /health (and optionally /products)
 
 Options:
-  --project-id <id>         GCP project id (default: project-f5f4f6f0-acae-485b-a16)
+  --project-id <id>         GCP project id (default: paw-2026-496213)
   --region <region>         Cloud Run/Artifact Registry region (default: europe-central2)
   --service <name>          Cloud Run service name (default: mini-allegro-dev)
   --repository <name>       Artifact Registry repository (default: mini-allegro)
