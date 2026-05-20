@@ -12,7 +12,7 @@ on:
       - ".github/workflows/deploy-products-service.yml"
 
 env:
-  PROJECT_ID: project-f5f4f6f0-acae-485b-a16
+  PROJECT_ID: paw-2026-496213
   REGION: europe-central2
   REGISTRY: europe-central2-docker.pkg.dev
   REPOSITORY: mini-allegro

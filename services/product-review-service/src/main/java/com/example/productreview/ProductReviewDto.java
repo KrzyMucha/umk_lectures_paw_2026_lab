@@ -1,10 +1,9 @@
 package com.example.productreview;
 
-import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 
 public record ProductReviewDto(
-        Integer id,
+        String id,
         Integer productId,
         Integer rating,
         String comment,
