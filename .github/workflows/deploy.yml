@@ -103,6 +103,22 @@ jobs:
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
             -backend-config="prefix=mini-allegro/dev"
 
+      - name: Import existing resources (one-time)
+        working-directory: infra/dev
+        run: |
+          # Import Cloud SQL instance if not already in state
+          if ! terraform state show google_sql_database_instance.this 2>/dev/null; then
+            terraform import google_sql_database_instance.this ${{ env.PROJECT_ID }}/${{ env.DEV_DB_INSTANCE_NAME }} || true
+          fi
+          # Import database
+          if ! terraform state show google_sql_database.this 2>/dev/null; then
+            terraform import google_sql_database.this ${{ env.PROJECT_ID }}/${{ env.DEV_DB_INSTANCE_NAME }}/mini_allegro_dev || true
+          fi
+          # Import database user
+          if ! terraform state show google_sql_user.this 2>/dev/null; then
+            terraform import google_sql_user.this ${{ env.PROJECT_ID }}/${{ env.DEV_DB_INSTANCE_NAME }}/app || true
+          fi
+
       - name: Terraform apply (DEV)
         working-directory: infra/dev
         run: terraform apply -input=false -auto-approve
