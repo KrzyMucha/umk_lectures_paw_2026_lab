@@ -96,23 +96,14 @@ resource "google_artifact_registry_repository" "mini_allegro" {
   description   = "Docker repository for mini-allegro"
 }
 
-import {
-  id = "projects/${var.project}/locations/${var.region}/repositories/mini-allegro"
-  to = google_artifact_registry_repository.mini_allegro
-}
-
-import {
-  id = "projects/${var.project}/locations/${var.region}/services/${var.service_name}"
-  to = google_cloud_run_v2_service.mini_allegro
-}
-
 # product-review-service ma osobny root Terraform (infra/product-review-service/),
 # więc nie możemy bezpośrednio odwołać się do jego zasobu przez referencję.
 # Zamiast tego używamy data source, który pobiera URI już zdeployowanego serwisu z GCP.
-data "google_cloud_run_v2_service" "product_review_service" {
-  name     = "product-review-service-dev"
-  location = var.region
-}
+# Zakomentowane dla nowej migracji - product-review-service będzie wdrożony oddzielnie.
+# data "google_cloud_run_v2_service" "product_review_service" {
+#   name     = "product-review-service-dev"
+#   location = var.region
+# }
 
 resource "google_cloud_run_v2_service" "mini_allegro" {
   name     = var.service_name
@@ -145,9 +136,15 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
       }
 
       env {
-        name  = "PRODUCT_REVIEW_SERVICE_URL"
-        value = data.google_cloud_run_v2_service.product_review_service.uri
+        name  = "DATABASE_URL"
+        value = format("postgresql://%s:%s@%s:5432/%s?sslmode=require", google_sql_user.dev.name, random_password.db_dev_password.result, google_sql_database_instance.dev.public_ip_address, google_sql_database.dev.name)
       }
+
+      # PRODUCT_REVIEW_SERVICE_URL będzie dodana po wdrożeniu product-review-service
+      # env {
+      #   name  = "PRODUCT_REVIEW_SERVICE_URL"
+      #   value = data.google_cloud_run_v2_service.product_review_service.uri
+      # }
     }
 
     scaling {
@@ -165,19 +162,28 @@ resource "google_cloud_run_v2_service" "mini_allegro" {
 # Cloud Build service account musi mieć prawo pushować obrazy do Artifact Registry
 data "google_project" "project" {}
 
-resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
-  location   = google_artifact_registry_repository.mini_allegro.location
-  repository = google_artifact_registry_repository.mini_allegro.repository_id
-  role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
-}
+# NOTE: IAM permissions for Cloud Build disabled due to insufficient permissions on falkowskisz01@gmail.com
+# To enable, grant artifactregistry.repositories.setIamPolicy permission or manually set IAM after deployment
+# resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
+#   location   = google_artifact_registry_repository.mini_allegro.location
+#   repository = google_artifact_registry_repository.mini_allegro.repository_id
+#   role       = "roles/artifactregistry.writer"
+#   member     = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+# }
 
-resource "google_cloud_run_v2_service_iam_member" "public_access" {
-  location = google_cloud_run_v2_service.mini_allegro.location
-  name     = google_cloud_run_v2_service.mini_allegro.name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
+# NOTE: IAM permissions for Cloud Run disabled due to insufficient permissions on falkowskisz01@gmail.com
+# To enable, grant run.services.setIamPolicy permission or manually set IAM using gcloud:
+# gcloud run services add-iam-policy-binding mini-allegro \
+#   --region=europe-central2 \
+#   --member=allUsers \
+#   --role=roles/run.invoker \
+#   --project=paw-2026-496213
+# resource "google_cloud_run_v2_service_iam_member" "mini_allegro_public_access" {
+#   location = google_cloud_run_v2_service.mini_allegro.location
+#   name     = google_cloud_run_v2_service.mini_allegro.name
+#   role     = "roles/run.invoker"
+#   member   = "allUsers"
+# }
 
 resource "google_logging_metric" "cloud_run_error_count" {
   name        = "mini_allegro_cloud_run_error_count"
