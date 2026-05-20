@@ -14,6 +14,13 @@ provider "google" {
   region  = var.region
 }
 
+# --- Wymagane API ---
+
+resource "google_project_service" "compute" {
+  service            = "compute.googleapis.com"
+  disable_on_destroy = false
+}
+
 # --- Elasticsearch VM ---
 
 resource "google_compute_instance" "elasticsearch" {
@@ -35,6 +42,8 @@ resource "google_compute_instance" "elasticsearch" {
   }
 
   tags = ["elasticsearch"]
+
+  depends_on = [google_project_service.compute]
 
   service_account {
     scopes = ["cloud-platform"]
@@ -122,6 +131,8 @@ resource "google_compute_firewall" "elasticsearch" {
 
   target_tags   = ["elasticsearch"]
   source_ranges = ["0.0.0.0/0"]
+
+  depends_on = [google_project_service.compute]
 }
 
 # --- Cloud Run: audit-log-service ---
