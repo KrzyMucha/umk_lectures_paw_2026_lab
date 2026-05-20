@@ -17,9 +17,15 @@ build_and_run() {
     --name "$CONTAINER_NAME" \
     -p 8081:8080 \
     -e PORT=8080 \
+    -e "DATABASE_URL=${DATABASE_URL:-}" \
     "$IMAGE_NAME" >/dev/null
 
   echo "Service running at http://localhost:8081"
+  if [ -z "${DATABASE_URL:-}" ]; then
+    echo "Note: DATABASE_URL not set. Service will use hardcoded fallback data."
+  else
+    echo "Note: DATABASE_URL is set. Service will query from database."
+  fi
 }
 
 stop_container() {

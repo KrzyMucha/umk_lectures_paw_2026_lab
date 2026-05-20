@@ -40,8 +40,11 @@ services:
       APP_ENV: dev
       DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL (for local use this should point to DEV Cloud SQL)}"
       OFFERS_SERVICE_URL: "http://offers-service:8082"
+      PURCHASE_SERVICE_URL: "http://purchase-service:8081"
     depends_on:
       offers-service:
+        condition: service_healthy
+      purchase-service:
         condition: service_healthy
 
   offers-service:
@@ -66,6 +69,29 @@ services:
     environment:
       DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL (for local use this should point to DEV Cloud SQL)}"
       PORT: "8082"
+
+  purchase-service:
+    build:
+      context: ../../purchase-service
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8081/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: "postgresql://app:app@db:5432/app"
+      PORT: "8081"
 
 volumes:
   vendor:
