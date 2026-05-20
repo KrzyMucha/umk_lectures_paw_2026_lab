@@ -17,8 +17,8 @@ Example:
   ./scripts/deploy_prod_with_rollback.sh \
     --service mini-allegro \
     --region europe-central2 \
-    --project project-f5f4f6f0-acae-485b-a16 \
-    --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest
+    --project paw-2026-496213 \
+    --image europe-central2-docker.pkg.dev/paw-2026-496213/mini-allegro/mini-allegro:latest
 EOF
 }
 

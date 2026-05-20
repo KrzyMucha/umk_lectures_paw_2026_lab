@@ -18,7 +18,7 @@ Jesteś agentem pracującym w tym repozytorium. Stwórz infrastrukturę i pipeli
 Stwórz trzy pliki wzorując się na `infra/products-service/`:
 
 - **`main.tf`** — `google_cloud_run_v2_service` z podanym portem + `google_cloud_run_v2_service_iam_member` (allUsers, roles/run.invoker). Backend GCS z `backend "gcs" {}`.
-- **`variables.tf`** — zmienne: `project` (default: `project-f5f4f6f0-acae-485b-a16`), `region` (default: `europe-central2`), `service_name` (default: `<SERVICE_NAME>-dev`), `image`.
+- **`variables.tf`** — zmienne: `project` (default: `paw-2026-496213`), `region` (default: `europe-central2`), `service_name` (default: `<SERVICE_NAME>-dev`), `image`.
 - **`outputs.tf`** — output `service_url` z URI Cloud Run.
 
 ### 2. GitHub Actions — `.github/workflows/deploy-<SERVICE_NAME>.yml`
@@ -44,7 +44,7 @@ terraform init \
   -backend-config="prefix=<SERVICE_NAME>/dev"
 
 terraform plan \
-  -var="image=europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/<SERVICE_NAME>:test"
+  -var="image=europe-central2-docker.pkg.dev/paw-2026-496213/mini-allegro/<SERVICE_NAME>:test"
 ```
 
 ## Ważne zasady

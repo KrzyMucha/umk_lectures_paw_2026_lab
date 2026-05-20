@@ -111,7 +111,7 @@ function Assert-PortFree {
     }
 }
 
-$GCP_PROJECT       = "project-f5f4f6f0-acae-485b-a16"
+$GCP_PROJECT       = "paw-2026-496213"
 $GCP_SQL_INSTANCE  = "mini-allegro-db-dev"
 $DB_USER           = "app"
 $DB_NAME           = "mini_allegro_dev"
