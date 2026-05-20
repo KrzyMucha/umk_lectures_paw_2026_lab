@@ -14,17 +14,6 @@ provider "google" {
   region  = var.region
 }
 
-# Firestore (Native mode) — baza danych dla product-review-service.
-# Importowana bo zostala stworzona recznie przed dodaniem do Terraform.
-import {
-  id = "projects/${var.project}/databases/(default)"
-  to = google_firestore_database.default
-}
-
-resource "google_firestore_database" "default" {
-  name        = "(default)"
-  location_id = var.region
-  type        = "FIRESTORE_NATIVE"
 }
 
 # Cloud Run domyslnie uzywa service account: PROJECT_NUMBER-compute@developer.gserviceaccount.com
@@ -37,17 +26,6 @@ resource "google_project_iam_member" "cloud_run_firestore" {
   member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 
-# Firestore (Native mode) — dedykowana baza dla product-review-service.
-# Import poniewaz baza zostala stworzona recznie przed dodaniem do Terraform.
-import {
-  id = "projects/${var.project}/databases/(default)"
-  to = google_firestore_database.default
-}
-
-resource "google_firestore_database" "default" {
-  name        = "(default)"
-  location_id = var.region
-  type        = "FIRESTORE_NATIVE"
 }
 
 resource "google_cloud_run_v2_service" "product_review_service" {

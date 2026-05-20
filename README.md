@@ -1,11 +1,12 @@
 #testing push 1
+
 # Mini Allegro - Infrastructure
 
 ## Wymagania
 
--   [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.0
--   [gcloud CLI](https://cloud.google.com/sdk/docs/install)
--   [Docker](https://docs.docker.com/get-docker/) z obsługą buildx
+- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.0
+- [gcloud CLI](https://cloud.google.com/sdk/docs/install)
+- [Docker](https://docs.docker.com/get-docker/) z obsługą buildx
 
 ---
 
@@ -16,7 +17,7 @@
 gcloud auth login
 
 # Ustaw projekt
-gcloud config set project project-f5f4f6f0-acae-485b-a16
+gcloud config set project paw-2026-496213
 
 # Skonfiguruj Docker do pushowania do Artifact Registry
 gcloud auth configure-docker europe-central2-docker.pkg.dev
@@ -45,7 +46,7 @@ cd services/symphony-monolith
 
 gcloud builds submit \
   --config=cloudbuild.yaml \
-  --project=project-f5f4f6f0-acae-485b-a16 \
+  --project=paw-2026-496213 \
   .
 ```
 
@@ -56,7 +57,7 @@ Używa tego samego cache z Artifact Registry co Cloud Build. Na Apple Silicon wy
 ```bash
 cd services/symphony-monolith
 
-REGISTRY=europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro
+REGISTRY=europe-central2-docker.pkg.dev/paw-2026-496213/mini-allegro/mini-allegro
 
 docker buildx build --platform linux/amd64 --target prod \
   --cache-from type=registry,ref=${REGISTRY}:cache \
@@ -126,9 +127,9 @@ done
 ```
 
 3. **Weryfikacja**:
-    - W Cloud Logging -> Logs Explorer, przefiltruj po severity=ERROR, resource.labels.service_name="mini-allegro"
-    - W Cloud Monitoring -> Alerting -> Policies, sprawdź status "mini-allegro Cloud Run error burst"
-    - Email powinnien przyjść na adres podany w `alert_email` w ciągu ~1 minuty od przekroczenia progu
+   - W Cloud Logging -> Logs Explorer, przefiltruj po severity=ERROR, resource.labels.service_name="mini-allegro"
+   - W Cloud Monitoring -> Alerting -> Policies, sprawdź status "mini-allegro Cloud Run error burst"
+   - Email powinnien przyjść na adres podany w `alert_email` w ciągu ~1 minuty od przekroczenia progu
 
 ---
 
@@ -210,7 +211,7 @@ terraform apply (Artifact Registry) → docker push → terraform apply (Cloud R
 
 ```shell
 gcloud run deploy mini-allegro \
-    --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
+    --image europe-central2-docker.pkg.dev/paw-2026-496213/mini-allegro/mini-allegro:latest \
     --region europe-central2
 ```
 
@@ -220,11 +221,11 @@ W repo jest gotowy skrypt: `services/symphony-monolith/scripts/deploy_prod_with_
 
 Co robi:
 
--   zapamiętuje poprzednią rewizję Cloud Run,
--   deployuje nową rewizję,
--   wykonuje healthcheck,
--   przy błędzie wykonuje rollback ruchem 100% na poprzednią rewizję przez:
-    `gcloud run services update-traffic`.
+- zapamiętuje poprzednią rewizję Cloud Run,
+- deployuje nową rewizję,
+- wykonuje healthcheck,
+- przy błędzie wykonuje rollback ruchem 100% na poprzednią rewizję przez:
+  `gcloud run services update-traffic`.
 
 Użycie:
 
@@ -234,8 +235,8 @@ chmod +x services/symphony-monolith/scripts/deploy_prod_with_rollback.sh
 ./services/symphony-monolith/scripts/deploy_prod_with_rollback.sh \
   --service mini-allegro \
   --region europe-central2 \
-  --project project-f5f4f6f0-acae-485b-a16 \
-  --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest
+  --project paw-2026-496213 \
+  --image europe-central2-docker.pkg.dev/paw-2026-496213/mini-allegro/mini-allegro:latest
 ```
 
 Opcjonalnie możesz zmienić endpoint healthcheck i retry:
@@ -244,7 +245,7 @@ Opcjonalnie możesz zmienić endpoint healthcheck i retry:
 ./services/symphony-monolith/scripts/deploy_prod_with_rollback.sh \
   --service mini-allegro \
   --region europe-central2 \
-  --image europe-central2-docker.pkg.dev/project-f5f4f6f0-acae-485b-a16/mini-allegro/mini-allegro:latest \
+  --image europe-central2-docker.pkg.dev/paw-2026-496213/mini-allegro/mini-allegro:latest \
   --health-path /health \
   --retries 12 \
   --sleep-seconds 5
