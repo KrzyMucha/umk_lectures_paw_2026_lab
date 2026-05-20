@@ -41,9 +41,16 @@ resource "google_cloud_run_v2_service" "products_service" {
   }
 }
 
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  name     = google_cloud_run_v2_service.products_service.name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
+# NOTE: IAM permissions disabled due to insufficient permissions on the service account.
+# Set manually using gcloud:
+# gcloud run services add-iam-policy-binding products-service-dev \
+#   --region=europe-central2 \
+#   --member=allUsers \
+#   --role=roles/run.invoker \
+#   --project=paw-2026-496213
+# resource "google_cloud_run_v2_service_iam_member" "public" {
+#   name     = google_cloud_run_v2_service.products_service.name
+#   location = var.region
+#   role     = "roles/run.invoker"
+#   member   = "allUsers"
+# }
