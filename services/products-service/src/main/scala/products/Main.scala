@@ -13,13 +13,17 @@ object Main extends IOApp.Simple:
     val port    = Port.fromInt(portNum).getOrElse(port"8081")
 
     Database.transactor(dbUrl).use: xa =>
-      val repo = ProductRepository(xa)
-      val ctrl = ProductController(repo)
+      val repo      = ProductRepository(xa)
+      val ctrl      = ProductController(repo)
+      val sportRepo = SportProductRepository(xa)
+      val ollama    = OllamaClient()
+      val gemini    = sys.env.get("GEMINI_API_KEY").map(GeminiClient(_))
+      val sportCtrl = SportProductController(sportRepo, ollama, gemini)
       IO.println(s"products-service starting on port $portNum ...") >>
         EmberServerBuilder.default[IO]
           .withHost(ipv4"0.0.0.0")
           .withPort(port)
-          .withHttpApp(Routes(ctrl).orNotFound)
+          .withHttpApp(Routes(ctrl, sportCtrl).orNotFound)
           .build
           .useForever
 

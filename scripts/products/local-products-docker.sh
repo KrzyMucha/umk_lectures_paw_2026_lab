@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../"	&& pwd)"
 SERVICE_DIR="$ROOT_DIR/services/products-service"
 IMAGE="products-service:local"
 CONTAINER="products-service-docker"

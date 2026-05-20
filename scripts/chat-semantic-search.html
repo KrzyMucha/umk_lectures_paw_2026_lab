@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantic Search — Historia rozmowy</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #16213e, #0f3460);
+    padding: 24px 32px;
+    border-bottom: 2px solid #e94560;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header h1 {
+    font-size: 1.5rem;
+    color: #e94560;
+    margin-bottom: 4px;
+  }
+  .header p {
+    font-size: 0.85rem;
+    color: #a0a0b0;
+  }
+  .subtitle-tags {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    background: #0f3460;
+    border: 1px solid #e94560;
+    color: #e94560;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+  }
+  .chat-container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+  .message {
+    display: flex;
+    margin-bottom: 20px;
+    gap: 12px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .message.user {
+    flex-direction: row-reverse;
+  }
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .message.user .avatar {
+    background: linear-gradient(135deg, #e94560, #c73652);
+    color: white;
+  }
+  .message.assistant .avatar {
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    border: 2px solid #e94560;
+    color: #e94560;
+  }
+  .bubble {
+    max-width: 78%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    line-height: 1.6;
+    font-size: 0.92rem;
+    white-space: pre-wrap;
+  }
+  .message.user .bubble {
+    background: linear-gradient(135deg, #e94560, #c73652);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .message.assistant .bubble {
+    background: #16213e;
+    border: 1px solid #2a2a4e;
+    color: #d0d0e0;
+    border-bottom-left-radius: 4px;
+  }
+  .bubble code, .bubble pre {
+    background: #0d0d1a;
+    border: 1px solid #2a2a4e;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    color: #7ec8e3;
+  }
+  .bubble pre {
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: 6px 0;
+    display: block;
+    white-space: pre;
+  }
+  .label {
+    font-size: 0.72rem;
+    color: #606080;
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+  .message.user .label {
+    text-align: right;
+  }
+  .message-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .message.user .message-wrap {
+    align-items: flex-end;
+  }
+  .section-divider {
+    text-align: center;
+    margin: 32px 0 16px;
+    position: relative;
+  }
+  .section-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #2a2a4e;
+  }
+  .section-divider span {
+    background: #1a1a2e;
+    padding: 0 16px;
+    position: relative;
+    color: #e94560;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: #404060;
+    font-size: 0.8rem;
+    border-top: 1px solid #2a2a4e;
+    margin-top: 40px;
+  }
+  @media print {
+    body { background: #fff; color: #000; }
+    .header { background: #f0f0f0; border-bottom: 2px solid #e94560; position: static; }
+    .header h1 { color: #e94560; }
+    .header p, .label { color: #666; }
+    .message.assistant .bubble { background: #f5f5f5; border: 1px solid #ddd; color: #222; }
+    .message.user .bubble { background: #e94560; color: white; }
+    .bubble code, .bubble pre { background: #f0f0f0; border: 1px solid #ccc; color: #0066cc; }
+    .tag { border-color: #e94560; color: #e94560; background: #fff; }
+    .section-divider::before { background: #ccc; }
+    .section-divider span { background: #fff; color: #e94560; }
+    .footer { color: #999; border-top: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🔍 Semantic Search — Scala + pgvector + Ollama + Gemini</h1>
+  <p>Historia implementacji wyszukiwania semantycznego produktów NBA | PAW 2026</p>
+  <div class="subtitle-tags">
+    <span class="tag">Scala 3.6.4</span>
+    <span class="tag">http4s</span>
+    <span class="tag">pgvector</span>
+    <span class="tag">Ollama nomic-embed-text</span>
+    <span class="tag">Gemini Embedding</span>
+    <span class="tag">PostgreSQL 16</span>
+    <span class="tag">1000 produktów NBA</span>
+  </div>
+</div>
+<div class="chat-container">
+<div class="section-divider"><span>Implementacja /sport-products/search</span></div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Kontynuujemy poprzednią sesję. Mamy już: 1000 produktów NBA z opisami w DB, 1000 embeddingów (768-dim) przez Ollama nomic-embed-text, endpointy GET /sport-products. Teraz tworzymy /sport-products/search z osobnym plikiem OllamaClient.scala.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Gotowe. Nowy plik OllamaClient.scala — 21 linii, cały Ollama logic w jednym miejscu.
+
+Nowy endpoint:
+<pre>GET /sport-products/search?q=LeBron+playoff+jersey&amp;limit=5</pre>
+
+Uruchomienie:
+<pre>./scripts/products/local-products-service.sh
+curl &quot;http://localhost:8081/sport-products/search?q=LeBron+playoff+jersey&quot;</pre></div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Jak powinienem wpisywać zapytania?</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Naturalnym językiem, tak jak byś opisał produkt:
+
+<pre>curl &quot;http://localhost:8081/sport-products/search?q=LeBron+playoff+jersey&quot;
+curl &quot;http://localhost:8081/sport-products/search?q=basketball+shoes+Nike&quot;
+curl &quot;http://localhost:8081/sport-products/search?q=Stephen+Curry+Warriors&amp;limit=3&quot;</pre>
+
+Wyszukiwanie semantyczne działa na podobieństwie wektorów — zwraca produkty, których opis znaczeniowo pasuje do zapytania, nie muszą zawierać dokładnych słów.</div>
+    </div>
+  </div>
+<div class="section-divider"><span>Testowanie — jak wpisywać zapytania?</span></div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Ale jak wpisuję &#x27;I want Barkley&#x27; to nie znajduje produktów Barkleya.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Produkty Barkleya są w DB (sprawdziłem). Problem leży gdzie indziej — prawdopodobnie serwis nie startuje.
+
+Sprawdziłem: port 8081 był już zajęty — serwis był już uruchomiony.
+
+Wyszukiwanie po prostu nie zwraca Barkleya bo to wyszukiwanie semantyczne oparte na opisach. Model nomic-embed-text nie łączy słowa &#x27;Barkley&#x27; z konkretnymi produktami.
+
+Do wyszukiwania po nazwisku użyj zwykłego endpointu:
+<pre>curl &quot;http://localhost:8081/sport-products?name=Barkley&quot;</pre>
+
+Semantic search działa najlepiej przy opisach jak:
+<pre>curl &quot;...?q=aggressive+rebounder+power+forward+Phoenix&quot;</pre></div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Ale nie mam żadnych błędów, mam po prostu inne produkty.</div>
+    </div>
+  </div>
+<div class="section-divider"><span>Poprawa jakości embeddingów</span></div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">To jest poprawne zachowanie wyszukiwania semantycznego — model nie wie że &#x27;Barkley&#x27; to koszykarz, bo to imię własne.
+
+Embedding dla produktu Barkleya zawierał &#x27;player: Charles Barkley&#x27; — więc zapytanie &#x27;Charles Barkley&#x27; powinno zadziałać:
+
+<pre>curl -s &quot;http://localhost:8081/sport-products/search?q=Charles+Barkley&amp;limit=5&quot;</pre>
+
+Sam &#x27;Barkley&#x27; to za mało — model dopasowuje pełny kontekst semantyczny.</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Może wektor powinien zawierać opis i tytuł?</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Tak, ma sens. Zmieniłem generate-embeddings.py — format tekstu do embeddingu to teraz tylko:
+nazwa | opis
+
+Po przeliczeniu embeddingi będą bardziej semantycznie spójne.</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">I może inne parametry — aby można było powiedzieć że chcę tani.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Ceny od ~$20 do ~$300, średnia ~$112. Dodałem do tekstu embeddingu opis kategorii cenowej:
+
+<pre>• &lt; $40 → &#x27;cheap budget affordable low price&#x27;
+• $40-90 → &#x27;affordable mid-range price&#x27;
+• $90-180 → &#x27;mid-range price&#x27;
+• &gt; $180 → &#x27;expensive premium luxury high price&#x27;</pre>
+
+Po przeliczeniu zadziałają zapytania:
+<pre>?q=cheap+basketball+shoes
+?q=affordable+jersey
+?q=expensive+premium+collectible</pre></div>
+    </div>
+  </div>
+<div class="section-divider"><span>Porównanie: MJ vs Kobe — ograniczenia modelu lokalnego</span></div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Dodaj wszystkie parametry — datę meczu, punkty itp.</div>
+    </div>
+  </div>
+<div class="section-divider"><span>Rozszerzenie: Gemini API jako drugi model</span></div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Zaktualizowałem format tekstu embeddingu do pełnego:
+nazwa | opis | cena (label) | player: X | opponent: X | game date: X | N points M rebounds A assists S steals B blocks
+
+Teraz zadziałają zapytania jak:
+<pre>?q=Charles+Barkley
+?q=40+points+game
+?q=high+assists+playmaker
+?q=1998+finals+jersey</pre></div>
+    </div>
+  </div>
+<div class="section-divider"><span>Wiele modeli — dwie kolumny w DB</span></div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Wszystkie produkty mają już embeddingi.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Wszystkie 1000 gotowe. Możesz testować:
+<pre>curl -s &quot;http://localhost:8081/sport-products/search?q=Charles+Barkley&quot; | python3 -m json.tool | grep -E &#x27;&quot;name&quot;|&quot;player&quot;&#x27;</pre></div>
+    </div>
+  </div>
+<div class="section-divider"><span>Debugowanie — klucz API</span></div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Kurde słabo — robię MJ i dostaję Kobe Bryant.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">To normalne — nomic-embed-text nie wie że &#x27;MJ&#x27; = Michael Jordan. Spróbuj pełnego imienia:
+<pre>curl -s &quot;http://localhost:8081/sport-products/search?q=Michael+Jordan&amp;limit=1&quot;</pre>
+
+Embeddingi były generowane z tekstem &#x27;player: Michael Jordan&#x27;, więc &#x27;MJ&#x27; semantycznie trafia w środowisko koszykówki lat 90. i zwraca podobnych zawodników (Kobe też jest &#x27;championship, legacy, clutch&#x27;). To ograniczenie modelu lokalnego — nie rozumie skrótów i pseudonimów.</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Ok, więc teraz zróbmy to samo z jakimś darmowym modelem zdalnym.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Klucz działa! Model to gemini-embedding-001 (3072 wymiarów).
+
+Ponieważ pgvector HNSW ma limit 2000 wymiarów, użyjemy outputDimensionality=768 — Gemini wspiera MRL więc jakość nadal dobra.
+
+Plan:
+1. Nowa kolumna embedding_gemini vector(768) w DB
+2. Skrypt generate-embeddings-gemini.py
+3. GeminiClient.scala (osobny plik)
+4. Parametr ?model=gemini lub ?model=ollama w endpoincie search</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Dodaj kolejną kolumnę, aby można było korzystać z wielu modeli. Dodaj kolejnego klienta. Dodaj kolejny skrypt dla nowej kolumny.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Zrobione i skompilowane!
+
+Nowe pliki:
+<pre>• GeminiClient.scala — używa Java stdlib HttpClient, outputDimensionality=768
+• generate-embeddings-gemini.py — zapisuje do kolumny embedding_gemini</pre>
+
+Zmiany w istniejących plikach:
+<pre>• SportProductRepository — nowa metoda findSimilarGemini()
+• SportProductController — parametr model: String
+• Routes — dodany ?model=gemini parametr
+• Main.scala — GeminiClient tworzony z GEMINI_API_KEY</pre>
+
+Użycie:
+<pre>curl &quot;...?q=Michael+Jordan&amp;model=gemini&amp;limit=3&quot;  ← Gemini
+curl &quot;...?q=Michael+Jordan&amp;model=ollama&amp;limit=3&quot;  ← Ollama</pre></div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Ok, zindeksowałem produkty — 997/1000 gotowe.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Przetestuj porównanie modeli:
+<pre>curl -s &quot;.../search?q=Michael+Jordan&amp;model=gemini&amp;limit=3&quot; | grep -E &#x27;&quot;name&quot;|&quot;player&quot;&#x27;
+curl -s &quot;.../search?q=Michael+Jordan&amp;model=ollama&amp;limit=3&quot; | grep -E &#x27;&quot;name&quot;|&quot;player&quot;&#x27;</pre></div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Mam w przeglądarce error: &#x27;gemini embedding failed&#x27;</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Port 8081 był zajęty — stary proces bez GEMINI_API_KEY. Zatrzymałem stary proces. Uruchom serwis ponownie:
+<pre>./scripts/products/local-products-service.sh</pre></div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">To samo — error: &#x27;gemini embedding failed&#x27;. Zrób tak aby serwis zwracał wszystkie szczegóły błędów.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Zaktualizowałem GeminiClient żeby rzucał wyjątek z pełną treścią odpowiedzi HTTP, i SportProductController żeby zwracał szczegóły przez .attempt. Teraz dostaniesz dokładny błąd od Gemini API.</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">error: { code: 400, message: &#x27;API key not valid. Please pass a valid API key.&#x27; }</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Klucz może być już nieważny — Google automatycznie unieważnia klucze API gdy wykryje je w plikach/rozmowach.
+
+Wygeneruj nowy na aistudio.google.com/apikey i zaktualizuj .env.</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Nie sądzę że to jest to — zrób tak aby wypisywał klucz w błędzie, zobaczymy czy ładuje poprawnie.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Klucz w błędzie to key=gsk_ltzI... — to klucz Groq, nie Gemini!
+
+Prawdopodobnie masz w środowisku zmienną GEMINI_API_KEY ustawioną na klucz Groq z poprzedniej sesji. Sprawdziłem .env — plik był pusty (nie zawierał GEMINI_API_KEY). Klucz wpisany był do innego miejsca lub niezapisany.</div>
+    </div>
+  </div>
+
+  <div class="message user">
+    <div class="avatar">Ty</div>
+    <div class="message-wrap">
+      <div class="label">Ty</div>
+      <div class="bubble">Czaję, możliwe że plik był otwarty w terminalu ale się nie zapisał.</div>
+    </div>
+  </div>
+
+  <div class="message assistant">
+    <div class="avatar">AI</div>
+    <div class="message-wrap">
+      <div class="label">GitHub Copilot</div>
+      <div class="bubble">Dodaj klucz ręcznie:
+echo &quot;GEMINI_API_KEY=AIza...&quot; &gt;&gt; services/products-service/.env
+cat services/products-service/.env  # weryfikacja
+Potem zrestartuj serwis.</div>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  PAW 2026 · UMK · Implementacja semantic search w mikroserwisie Scala
+</div>
+</body>
+</html>
