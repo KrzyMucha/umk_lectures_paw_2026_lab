@@ -76,6 +76,35 @@ def _get_db_connection() -> psycopg.Connection | None:
         return None
 
 
+def _init_db() -> None:
+    conn = _get_db_connection()
+    if conn is None:
+        _json_log("database init skipped", reason="no connection")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS purchase (
+                    id SERIAL PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    offer_id INT NOT NULL,
+                    quantity INT NOT NULL,
+                    price_per_unit DOUBLE PRECISION NOT NULL,
+                    status VARCHAR(32) NOT NULL,
+                    super_seller_id INT NULL
+                )
+                """
+            )
+        conn.commit()
+        _json_log("database init complete", table="purchase")
+    except Exception as e:
+        _json_log("database init failed", error=str(e))
+    finally:
+        conn.close()
+
+
 def _fetch_purchases_from_db() -> list[dict[str, Any]] | None:
     """
     Fetch all purchases from the database.
@@ -194,7 +223,7 @@ def _fetch_purchases_filtered_from_db(offer_id: int | None = None, user_id: int 
         conn.close()
 
 
-def _create_purchase_in_db(user_id: int, offer_id: int, quantity: int, price_per_unit: float, status: str) -> dict[str, Any] | None:
+def _create_purchase_in_db(user_id: int, offer_id: int, quantity: int, price_per_unit: float, status: str, super_seller_id: int | None = None) -> dict[str, Any] | None:
     conn = _get_db_connection()
     if conn is None:
         return None
@@ -202,8 +231,8 @@ def _create_purchase_in_db(user_id: int, offer_id: int, quantity: int, price_per
     try:
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute(
-                "INSERT INTO purchase (user_id, offer_id, quantity, price_per_unit, status) VALUES (%s, %s, %s, %s, %s) RETURNING id, user_id as userId, offer_id as offerId, quantity, price_per_unit as pricePerUnit, status",
-                (user_id, offer_id, quantity, price_per_unit, status),
+                "INSERT INTO purchase (user_id, offer_id, quantity, price_per_unit, status, super_seller_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, user_id as userId, offer_id as offerId, quantity, price_per_unit as pricePerUnit, status, super_seller_id",
+                (user_id, offer_id, quantity, price_per_unit, status, super_seller_id),
             )
             row = cur.fetchone()
             if row is None:
@@ -217,6 +246,7 @@ def _create_purchase_in_db(user_id: int, offer_id: int, quantity: int, price_per
                 "pricePerUnit": float(row["pricePerUnit"]),
                 "totalPrice": float(row["quantity"] * row["pricePerUnit"]),
                 "status": row["status"],
+                "superSellerId": row.get("super_seller_id"),
             }
     except Exception as e:
         _json_log("database insert failed", error=str(e))
@@ -324,16 +354,27 @@ def create_purchase() -> Any:
     quantity = payload.get("quantity")
     price_per_unit = payload.get("pricePerUnit")
     status = payload.get("status", "completed")
+    super_seller_id = payload.get("superSellerId")
 
     if not (isinstance(user_id, int) and isinstance(offer_id, int) and isinstance(quantity, int) and (isinstance(price_per_unit, (int, float)) or isinstance(price_per_unit, str)) and isinstance(status, str)):
         return jsonify({"error": "Fields userId, offerId, quantity, pricePerUnit, status are required and should be correct types"}), 400
+
+    if super_seller_id is not None and not isinstance(super_seller_id, int):
+        return jsonify({"error": "superSellerId must be an integer if provided"}), 400
 
     try:
         price_per_unit_f = float(price_per_unit)
     except Exception:
         return jsonify({"error": "pricePerUnit must be a number"}), 400
 
-    created = _create_purchase_in_db(user_id=user_id, offer_id=offer_id, quantity=quantity, price_per_unit=price_per_unit_f, status=status)
+    created = _create_purchase_in_db(
+        user_id=user_id,
+        offer_id=offer_id,
+        quantity=quantity,
+        price_per_unit=price_per_unit_f,
+        status=status,
+        super_seller_id=super_seller_id,
+    )
     if created is None:
         # If DB not available, return 503
         return jsonify({"error": "Could not create purchase"}), 503
@@ -371,5 +412,6 @@ def get_purchase_by_id(purchase_id: int) -> Any:
 
 
 if __name__ == "__main__":
+    _init_db()
     port = int(os.getenv("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
