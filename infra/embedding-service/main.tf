@@ -70,7 +70,7 @@ resource "google_compute_instance" "qdrant" {
 
   tags = ["qdrant"]
 
-  metadata_startup_script = <<-'EOT'
+  metadata_startup_script = <<-EOT
     #!/bin/bash
     set -e
 
@@ -92,16 +92,16 @@ resource "google_compute_instance" "qdrant" {
     cat > /usr/local/bin/idle-watchdog.sh << 'SCRIPT'
     #!/bin/bash
     IDLE_TIMEOUT=600
-    LAST_ACTIVITY=$(date +%s)
+    LAST_ACTIVITY=$$(date +%s)
 
     while true; do
-      CONNS=$(ss -tn state established '( dport = :6333 or sport = :6333 )' | tail -n +2 | wc -l)
-      if [ "$CONNS" -gt 0 ]; then
-        LAST_ACTIVITY=$(date +%s)
+      CONNS=$$(ss -tn state established '( dport = :6333 or sport = :6333 )' | tail -n +2 | wc -l)
+      if [ "$$CONNS" -gt 0 ]; then
+        LAST_ACTIVITY=$$(date +%s)
       fi
 
-      NOW=$(date +%s)
-      if [ $((NOW - LAST_ACTIVITY)) -ge $IDLE_TIMEOUT ]; then
+      NOW=$$(date +%s)
+      if [ $$((NOW - LAST_ACTIVITY)) -ge $$IDLE_TIMEOUT ]; then
         shutdown -h now
         exit 0
       fi
