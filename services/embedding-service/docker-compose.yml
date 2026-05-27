@@ -1,21 +1,11 @@
 services:
-  db:
-    image: pgvector/pgvector:pg16
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U embedding -d embedding"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
+  qdrant:
+    image: qdrant/qdrant:latest
     ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_DB: embedding
-      POSTGRES_USER: embedding
-      POSTGRES_PASSWORD: embedding
+      - "6333:6333"
+      - "6334:6334"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - qdrant_data:/qdrant/storage
 
   app:
     build: .
@@ -23,10 +13,9 @@ services:
       - "8084:8080"
     environment:
       PORT: "8080"
-      DATABASE_URL: "postgresql://embedding:embedding@db:5432/embedding"
+      QDRANT_URL: "http://qdrant:6333"
     depends_on:
-      db:
-        condition: service_healthy
+      - qdrant
 
 volumes:
-  pgdata:
+  qdrant_data:
