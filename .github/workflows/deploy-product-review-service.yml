@@ -1,4 +1,4 @@
-name: Deploy product-review-service DEV
+name: Deploy product-review-service
 
 on:
   push:
@@ -8,6 +8,34 @@ on:
       - "services/product-review-service/**"
       - "infra/product-review-service/**"
       - ".github/workflows/deploy-product-review-service.yml"
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: string
+        default: dev
+      service_name:
+        required: false
+        type: string
+        default: product-review-service-dev
+      image_tag_suffix:
+        required: false
+        type: string
+        default: dev
+      sha:
+        required: false
+        type: string
+    secrets:
+      GCP_SA_KEY:
+        required: true
+      TF_STATE_BUCKET:
+        required: true
+      DATABASE_URL:
+        required: true
+    outputs:
+      product_review_service_url:
+        description: "Deployed product-review-service Cloud Run URL"
+        value: ${{ jobs.deploy.outputs.product_review_service_url }}
 
 env:
   PROJECT_ID: paw-2026-496213
@@ -27,7 +55,7 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
-          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.DEV_DATABASE_URL }}
         run: |
           missing=0
           if [ -z "$GCP_SA_KEY" ]; then
@@ -38,8 +66,8 @@ jobs:
             echo "Missing required secret: TF_STATE_BUCKET"
             missing=1
           fi
-          if [ -z "$DEV_DATABASE_URL" ]; then
-            echo "Missing required secret: DEV_DATABASE_URL"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Missing required secret: DATABASE_URL"
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
@@ -68,7 +96,8 @@ jobs:
       - name: Generate image tag
         id: meta
         run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}-dev"
+          SOURCE_SHA="${{ inputs.sha || github.sha }}"
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${SOURCE_SHA}-${{ inputs.image_tag_suffix || 'dev' }}"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -88,7 +117,7 @@ jobs:
     name: Terraform apply (product-review-service infra)
     needs: build
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ inputs.environment || 'dev' }}
 
     steps:
       - name: Checkout code
@@ -113,7 +142,7 @@ jobs:
           terraform init \
             -input=false \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="prefix=product-review-service/dev"
+            -backend-config="prefix=product-review-service/${{ inputs.environment || 'dev' }}"
 
       - name: Terraform apply
         working-directory: infra/product-review-service
@@ -122,13 +151,16 @@ jobs:
             -input=false \
             -auto-approve \
             -var="image=${{ needs.build.outputs.image_tag }}" \
-            -var="database_url=${{ secrets.DEV_DATABASE_URL }}"
+            -var="service_name=${{ inputs.service_name || env.SERVICE_DEV }}" \
+            -var="database_url=${{ secrets.DATABASE_URL || secrets.DEV_DATABASE_URL }}"
 
   deploy:
-    name: Deploy to Cloud Run DEV
+    name: Deploy to Cloud Run
     needs: [build, terraform]
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ inputs.environment || 'dev' }}
+    outputs:
+      product_review_service_url: ${{ steps.url.outputs.product_review_service_url }}
 
     steps:
       - name: Authenticate to GCP
@@ -139,13 +171,13 @@ jobs:
       - name: Deploy to Cloud Run DEV
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: ${{ env.SERVICE_DEV }}
+          service: ${{ inputs.service_name || env.SERVICE_DEV }}
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
 
       - name: Health check GET /product-reviews
         run: |
-          URL=$(gcloud run services describe ${{ env.SERVICE_DEV }} \
+          URL=$(gcloud run services describe ${{ inputs.service_name || env.SERVICE_DEV }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "DEV URL: $URL"
@@ -155,3 +187,11 @@ jobs:
             exit 1
           fi
           echo "product-review-service is healthy"
+
+      - name: Output service URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ${{ inputs.service_name || env.SERVICE_DEV }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "product_review_service_url=${URL}" >> "$GITHUB_OUTPUT"
