@@ -144,11 +144,6 @@ resource "google_cloud_run_v2_service" "embedding_service" {
       }
 
       env {
-        name  = "PORT"
-        value = "8080"
-      }
-
-      env {
         name  = "GEMINI_API_KEY"
         value = google_apikeys_key.gemini.key_string
       }
