@@ -14,8 +14,6 @@ provider "google" {
   region  = var.region
 }
 
-}
-
 # Cloud Run domyslnie uzywa service account: PROJECT_NUMBER-compute@developer.gserviceaccount.com
 # Nadajemy mu dostep do Firestore
 data "google_project" "project" {}
@@ -24,8 +22,6 @@ resource "google_project_iam_member" "cloud_run_firestore" {
   project = var.project
   role    = "roles/datastore.user"
   member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
-}
-
 }
 
 resource "google_cloud_run_v2_service" "product_review_service" {
