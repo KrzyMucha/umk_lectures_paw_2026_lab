@@ -2,12 +2,14 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-from app.models import SearchRequest, SearchResponse, SearchResultItem
-from app.qdrant import COLLECTION_NAME, MODELS, ensure_collection, get_client
+from app.embed import EMBEDDERS
+from app.models import SearchResponse, SearchResultItem
+from app.qdrant import COLLECTION_NAME, ensure_collection, get_client
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("embedding-service")
@@ -28,24 +30,29 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/search", response_model=SearchResponse)
-def search(req: SearchRequest):
-    expected_dim = MODELS[req.model]
+@app.get("/search", response_model=SearchResponse)
+def search(
+    query: str = Query(min_length=1),
+    model: Literal["ollama", "gemini"] = Query(),
+    limit: int = Query(default=5, ge=1, le=100),
+):
+    embed_fn = EMBEDDERS.get(model)
+    if embed_fn is None:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {model}")
 
-    if len(req.vector) != expected_dim:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Vector dimension mismatch: expected {expected_dim} for model '{req.model}', got {len(req.vector)}",
-        )
+    try:
+        vector = embed_fn(query)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Embedding failed: {e}")
 
     results_raw = get_client().query_points(
         collection_name=COLLECTION_NAME,
-        query=req.vector,
-        using=req.model,
+        query=vector,
+        using=model,
         query_filter=Filter(
-            must=[FieldCondition(key="model", match=MatchValue(value=req.model))]
+            must=[FieldCondition(key="model", match=MatchValue(value=model))]
         ),
-        limit=req.limit,
+        limit=limit,
         with_payload=True,
     )
 
@@ -59,10 +66,10 @@ def search(req: SearchRequest):
     ]
 
     logger.info(
-        json.dumps({"message": "search", "model": req.model, "results": len(results)})
+        json.dumps({"message": "search", "model": model, "query": query, "results": len(results)})
     )
 
-    return SearchResponse(results=results, model=req.model, count=len(results))
+    return SearchResponse(results=results, model=model, count=len(results))
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ jobs:
             -var="image=${{ needs.build.outputs.image_tag }}"
 
   ensure-qdrant:
-    name: Ensure Qdrant VM is running
+    name: Ensure Qdrant + Ollama VM is running
     needs: terraform
     runs-on: ubuntu-latest
     environment: dev
@@ -147,7 +147,7 @@ jobs:
           QDRANT_IP=$(gcloud compute addresses describe qdrant-dev-ip \
             --region=${{ env.REGION }} \
             --format='value(address)')
-          echo "Qdrant IP: $QDRANT_IP"
+          echo "VM IP: $QDRANT_IP"
           for i in $(seq 1 30); do
             if curl -sf "http://$QDRANT_IP:6333/healthz" >/dev/null 2>&1; then
               echo "Qdrant is healthy"
@@ -157,6 +157,22 @@ jobs:
             sleep 10
           done
           echo "Qdrant failed to become healthy after 5 minutes"
+          exit 1
+
+      - name: Wait for Ollama to be healthy
+        run: |
+          QDRANT_IP=$(gcloud compute addresses describe qdrant-dev-ip \
+            --region=${{ env.REGION }} \
+            --format='value(address)')
+          for i in $(seq 1 30); do
+            if curl -sf "http://$QDRANT_IP:11434/api/tags" >/dev/null 2>&1; then
+              echo "Ollama is healthy"
+              exit 0
+            fi
+            echo "Waiting for Ollama... ($i/30)"
+            sleep 10
+          done
+          echo "Ollama failed to become healthy after 5 minutes"
           exit 1
 
   deploy:

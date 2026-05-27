@@ -7,6 +7,13 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
   app:
     build: .
     ports:
@@ -14,8 +21,11 @@ services:
     environment:
       PORT: "8080"
       QDRANT_URL: "http://qdrant:6333"
+      OLLAMA_URL: "http://ollama:11434"
     depends_on:
       - qdrant
+      - ollama
 
 volumes:
   qdrant_data:
+  ollama_data:

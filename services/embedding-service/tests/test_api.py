@@ -23,10 +23,14 @@ def _make_point(id: int, raw: str, score: float, model: str = "ollama"):
     return point
 
 
+FAKE_VECTOR = _random_vector(768)
+
+
 @pytest.fixture()
 def client():
     with patch("app.main.get_client") as mock_get_client, \
-         patch("app.main.ensure_collection"):
+         patch("app.main.ensure_collection"), \
+         patch("app.main.EMBEDDERS", {"ollama": lambda t: FAKE_VECTOR, "gemini": lambda t: FAKE_VECTOR}):
         mock_qdrant = MagicMock()
         mock_get_client.return_value = mock_qdrant
 
@@ -51,8 +55,8 @@ class TestSearch:
             _make_point(2, "Mechanical Keyboard", 0.85),
         ])
 
-        resp = c.post("/search", json={
-            "vector": _random_vector(768),
+        resp = c.get("/search", params={
+            "query": "mouse",
             "model": "ollama",
             "limit": 2,
         })
@@ -61,7 +65,6 @@ class TestSearch:
         body = resp.json()
         assert body["model"] == "ollama"
         assert body["count"] == 2
-        assert len(body["results"]) == 2
         assert body["results"][0]["id"] == 1
         assert body["results"][0]["raw"] == "Wireless Mouse"
         assert body["results"][0]["score"] == 0.95
@@ -72,8 +75,8 @@ class TestSearch:
             _make_point(3, "USB-C Hub", 0.9, model="gemini"),
         ])
 
-        resp = c.post("/search", json={
-            "vector": _random_vector(768),
+        resp = c.get("/search", params={
+            "query": "hub",
             "model": "gemini",
             "limit": 1,
         })
@@ -86,13 +89,12 @@ class TestSearch:
     def test_calls_qdrant_with_correct_params(self, client):
         c, mock_qdrant = client
         mock_qdrant.query_points.return_value = _mock_query_result([])
-        vec = _random_vector(768)
 
-        c.post("/search", json={"vector": vec, "model": "ollama", "limit": 7})
+        c.get("/search", params={"query": "test", "model": "ollama", "limit": 7})
 
         mock_qdrant.query_points.assert_called_once_with(
             collection_name="embeddings",
-            query=vec,
+            query=FAKE_VECTOR,
             using="ollama",
             query_filter=ANY,
             limit=7,
@@ -103,10 +105,7 @@ class TestSearch:
         c, mock_qdrant = client
         mock_qdrant.query_points.return_value = _mock_query_result([])
 
-        c.post("/search", json={
-            "vector": _random_vector(768),
-            "model": "ollama",
-        })
+        c.get("/search", params={"query": "test", "model": "ollama"})
 
         call_kwargs = mock_qdrant.query_points.call_args.kwargs
         qf = call_kwargs["query_filter"]
@@ -118,10 +117,7 @@ class TestSearch:
         c, mock_qdrant = client
         mock_qdrant.query_points.return_value = _mock_query_result([])
 
-        resp = c.post("/search", json={
-            "vector": _random_vector(768),
-            "model": "ollama",
-        })
+        resp = c.get("/search", params={"query": "nothing", "model": "ollama"})
 
         assert resp.status_code == 200
         body = resp.json()
@@ -132,66 +128,37 @@ class TestSearch:
         c, mock_qdrant = client
         mock_qdrant.query_points.return_value = _mock_query_result([])
 
-        c.post("/search", json={
-            "vector": _random_vector(768),
-            "model": "ollama",
-        })
+        c.get("/search", params={"query": "test", "model": "ollama"})
 
         _, kwargs = mock_qdrant.query_points.call_args
         assert kwargs["limit"] == 5
 
-    def test_wrong_dimension_ollama(self, client):
-        c, _ = client
-        resp = c.post("/search", json={
-            "vector": [0.1, 0.2, 0.3],
-            "model": "ollama",
-        })
-        assert resp.status_code == 400
-        assert "expected 768" in resp.json()["detail"]
-        assert "got 3" in resp.json()["detail"]
-
-    def test_wrong_dimension_gemini(self, client):
-        c, _ = client
-        resp = c.post("/search", json={
-            "vector": [0.1, 0.2, 0.3],
-            "model": "gemini",
-        })
-        assert resp.status_code == 400
-        assert "expected 768" in resp.json()["detail"]
-        assert "got 3" in resp.json()["detail"]
-
     def test_invalid_model(self, client):
         c, _ = client
-        resp = c.post("/search", json={
-            "vector": [0.1],
-            "model": "invalid",
-        })
+        resp = c.get("/search", params={"query": "test", "model": "invalid"})
         assert resp.status_code == 422
 
-    def test_missing_vector(self, client):
+    def test_missing_query(self, client):
         c, _ = client
-        resp = c.post("/search", json={"model": "ollama"})
+        resp = c.get("/search", params={"model": "ollama"})
         assert resp.status_code == 422
 
     def test_missing_model(self, client):
         c, _ = client
-        resp = c.post("/search", json={"vector": [0.1]})
+        resp = c.get("/search", params={"query": "test"})
+        assert resp.status_code == 422
+
+    def test_empty_query(self, client):
+        c, _ = client
+        resp = c.get("/search", params={"query": "", "model": "ollama"})
         assert resp.status_code == 422
 
     def test_limit_too_high(self, client):
         c, _ = client
-        resp = c.post("/search", json={
-            "vector": [0.1],
-            "model": "ollama",
-            "limit": 200,
-        })
+        resp = c.get("/search", params={"query": "test", "model": "ollama", "limit": 200})
         assert resp.status_code == 422
 
     def test_limit_zero(self, client):
         c, _ = client
-        resp = c.post("/search", json={
-            "vector": [0.1],
-            "model": "ollama",
-            "limit": 0,
-        })
+        resp = c.get("/search", params={"query": "test", "model": "ollama", "limit": 0})
         assert resp.status_code == 422
