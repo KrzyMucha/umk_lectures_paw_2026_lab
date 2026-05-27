@@ -10,6 +10,14 @@ on:
       - "services/products-service/**"
       - "infra/products-service/**"
       - ".github/workflows/deploy-products-service.yml"
+  workflow_call:
+    secrets:
+      GCP_SA_KEY:
+        required: true
+      TF_STATE_BUCKET:
+        required: true
+      DEV_DATABASE_URL:
+        required: true
 
 env:
   PROJECT_ID: paw-2026-496213
