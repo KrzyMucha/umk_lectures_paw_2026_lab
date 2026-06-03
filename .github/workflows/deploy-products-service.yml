@@ -153,13 +153,13 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ needs.build.outputs.image_tag }}
 
-      - name: Health check GET /products
+      - name: Health check GET /health
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_DEV }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "DEV URL: $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/products")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health")
           if [ "$STATUS" != "200" ]; then
             echo "Health check failed! Got HTTP $STATUS"
             exit 1

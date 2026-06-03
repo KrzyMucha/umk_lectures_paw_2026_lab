@@ -10,5 +10,6 @@ object Routes:
 
   def apply(ctrl: ProductController): HttpRoutes[IO] =
     HttpRoutes.of[IO]:
+      case GET -> Root / "health"       => Ok("ok")
       case GET -> Root / "products"        => ctrl.list
       case req @ POST -> Root / "products" => req.as[ProductInput].flatMap(ctrl.create)
