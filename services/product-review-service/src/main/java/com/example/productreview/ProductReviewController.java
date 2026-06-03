@@ -24,6 +24,11 @@ public class ProductReviewController {
                 .toList();
     }
 
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("OK");
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ProductReviewDto> show(@PathVariable String id) {
         return repository.findById(id)
