@@ -24,6 +24,12 @@ def request_json(path: str, method: str = "GET", payload: dict | None = None, ex
     except urllib.error.HTTPError as error:
         status = error.code
         raw_body = error.read().decode("utf-8")
+        # Detect common DB authentication error in HTML/error body and raise clearer message
+        if 'password authentication failed for user' in raw_body:
+            raise AssertionError( 
+                "Service returned DB authentication error (password authentication failed for user).\n"
+                "Check that the service's DATABASE_URL / DB_* environment variables and CI secrets are correct."
+            )
     except urllib.error.URLError as error:
         raise AssertionError(f"Request to {url} failed: {error}") from error
 
