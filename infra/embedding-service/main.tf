@@ -165,8 +165,28 @@ resource "google_cloud_run_v2_service" "embedding_service" {
       }
 
       env {
+        name  = "QDRANT_COLLECTION"
+        value = var.qdrant_collection
+      }
+
+      env {
         name  = "OLLAMA_URL"
         value = "http://${google_compute_address.qdrant.address}:11434"
+      }
+
+      env {
+        name  = "OLLAMA_MODEL"
+        value = var.ollama_model
+      }
+
+      env {
+        name  = "GEMINI_MODEL"
+        value = var.gemini_model
+      }
+
+      env {
+        name  = "GEMINI_DIM"
+        value = tostring(var.gemini_dim)
       }
 
       resources {

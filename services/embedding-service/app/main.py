@@ -5,11 +5,10 @@ from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
-from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-from app.embed import EMBEDDERS
+from app.embed import MODELS
 from app.models import SearchResponse, SearchResultItem
-from app.qdrant import COLLECTION_NAME, ensure_collection, get_client
+from app.qdrant import COLLECTION_NAME, get_client, verify_collection
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("embedding-service")
@@ -17,7 +16,7 @@ logger = logging.getLogger("embedding-service")
 
 @asynccontextmanager
 async def lifespan(a: FastAPI):
-    ensure_collection()
+    verify_collection()
     yield
 
 
@@ -36,22 +35,21 @@ def search(
     model: Literal["ollama", "gemini"] = Query(),
     limit: int = Query(default=5, ge=1, le=100),
 ):
-    embed_fn = EMBEDDERS.get(model)
-    if embed_fn is None:
+    cfg = MODELS.get(model)
+    if cfg is None:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model}")
 
     try:
-        vector = embed_fn(query)
+        vector = cfg["embed"](query)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Embedding failed: {e}")
 
+    # Each point holds both named vectors; selecting the vector is enough — no
+    # payload filtering needed.
     results_raw = get_client().query_points(
         collection_name=COLLECTION_NAME,
         query=vector,
-        using=model,
-        query_filter=Filter(
-            must=[FieldCondition(key="model", match=MatchValue(value=model))]
-        ),
+        using=cfg["vector"],
         limit=limit,
         with_payload=True,
     )

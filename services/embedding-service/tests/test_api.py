@@ -1,5 +1,5 @@
 import random
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,22 +15,28 @@ def _mock_query_result(points):
     return result
 
 
-def _make_point(id: int, raw: str, score: float, model: str = "ollama"):
+def _make_point(id: int, raw: str, score: float):
     point = MagicMock()
     point.id = id
-    point.payload = {"raw": raw, "model": model}
+    point.payload = {"raw": raw}
     point.score = score
     return point
 
 
-FAKE_VECTOR = _random_vector(768)
+FAKE_OLLAMA_VECTOR = _random_vector(768)
+FAKE_GEMINI_VECTOR = _random_vector(3072)
+
+FAKE_MODELS = {
+    "ollama": {"vector": "nomic-embed-text", "dim": 768, "embed": lambda t: FAKE_OLLAMA_VECTOR},
+    "gemini": {"vector": "gemini-embedding-2", "dim": 3072, "embed": lambda t: FAKE_GEMINI_VECTOR},
+}
 
 
 @pytest.fixture()
 def client():
     with patch("app.main.get_client") as mock_get_client, \
-         patch("app.main.ensure_collection"), \
-         patch("app.main.EMBEDDERS", {"ollama": lambda t: FAKE_VECTOR, "gemini": lambda t: FAKE_VECTOR}):
+         patch("app.main.verify_collection"), \
+         patch("app.main.MODELS", FAKE_MODELS):
         mock_qdrant = MagicMock()
         mock_get_client.return_value = mock_qdrant
 
@@ -72,7 +78,7 @@ class TestSearch:
     def test_gemini_returns_results(self, client):
         c, mock_qdrant = client
         mock_qdrant.query_points.return_value = _mock_query_result([
-            _make_point(3, "USB-C Hub", 0.9, model="gemini"),
+            _make_point(3, "USB-C Hub", 0.9),
         ])
 
         resp = c.get("/search", params={
@@ -93,25 +99,22 @@ class TestSearch:
         c.get("/search", params={"query": "test", "model": "ollama", "limit": 7})
 
         mock_qdrant.query_points.assert_called_once_with(
-            collection_name="embeddings",
-            query=FAKE_VECTOR,
-            using="ollama",
-            query_filter=ANY,
+            collection_name="ai-arxiv",
+            query=FAKE_OLLAMA_VECTOR,
+            using="nomic-embed-text",
             limit=7,
             with_payload=True,
         )
 
-    def test_filter_uses_model(self, client):
+    def test_gemini_uses_named_vector(self, client):
         c, mock_qdrant = client
         mock_qdrant.query_points.return_value = _mock_query_result([])
 
-        c.get("/search", params={"query": "test", "model": "ollama"})
+        c.get("/search", params={"query": "test", "model": "gemini"})
 
         call_kwargs = mock_qdrant.query_points.call_args.kwargs
-        qf = call_kwargs["query_filter"]
-        assert len(qf.must) == 1
-        assert qf.must[0].key == "model"
-        assert qf.must[0].match.value == "ollama"
+        assert call_kwargs["using"] == "gemini-embedding-2"
+        assert "query_filter" not in call_kwargs
 
     def test_empty_results(self, client):
         c, mock_qdrant = client
