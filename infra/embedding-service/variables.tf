@@ -24,5 +24,5 @@ variable "image" {
 variable "qdrant_machine_type" {
   description = "GCE machine type for the Qdrant VM"
   type        = string
-  default     = "e2-small"
+  default     = "e2-medium"
 }

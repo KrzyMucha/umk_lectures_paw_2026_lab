@@ -41,7 +41,7 @@ resource "google_apikeys_key" "gemini" {
   ]
 }
 
-# --- Qdrant on GCE VM ---
+# --- Qdrant + Ollama on GCE VM ---
 
 resource "google_compute_address" "qdrant" {
   name   = "qdrant-dev-ip"
@@ -88,6 +88,17 @@ resource "google_compute_instance" "qdrant" {
         -v /qdrant_storage:/qdrant/storage \
         qdrant/qdrant:latest
 
+    # Start existing Ollama container or create a new one
+    docker start ollama 2>/dev/null || \
+      docker run -d --restart=always --name ollama \
+        -p 11434:11434 \
+        -v /ollama_data:/root/.ollama \
+        ollama/ollama:latest
+
+    # Pull embedding model (idempotent)
+    sleep 5
+    docker exec ollama ollama pull nomic-embed-text
+
     # Idle watchdog — shutdown after 10 min with zero connections
     cat > /usr/local/bin/idle-watchdog.sh << 'SCRIPT'
     #!/bin/bash
@@ -95,7 +106,7 @@ resource "google_compute_instance" "qdrant" {
     LAST_ACTIVITY=$$(date +%s)
 
     while true; do
-      CONNS=$$(ss -tn state established '( dport = :6333 or sport = :6333 )' | tail -n +2 | wc -l)
+      CONNS=$$(ss -tn state established '( dport = :6333 or sport = :6333 or dport = :11434 or sport = :11434 )' | tail -n +2 | wc -l)
       if [ "$$CONNS" -gt 0 ]; then
         LAST_ACTIVITY=$$(date +%s)
       fi
@@ -122,7 +133,7 @@ resource "google_compute_firewall" "qdrant" {
 
   allow {
     protocol = "tcp"
-    ports    = ["6333", "6334"]
+    ports    = ["6333", "6334", "11434"]
   }
 
   source_ranges = ["0.0.0.0/0"]
@@ -151,6 +162,11 @@ resource "google_cloud_run_v2_service" "embedding_service" {
       env {
         name  = "QDRANT_URL"
         value = "http://${google_compute_address.qdrant.address}:6333"
+      }
+
+      env {
+        name  = "OLLAMA_URL"
+        value = "http://${google_compute_address.qdrant.address}:11434"
       }
 
       resources {
