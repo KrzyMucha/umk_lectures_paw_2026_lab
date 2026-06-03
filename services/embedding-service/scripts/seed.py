@@ -56,9 +56,10 @@ def embed_ollama(text: str) -> list[float]:
 
 
 def embed_gemini(text: str) -> list[float]:
+    # Key goes in a header, never the URL/query string, to keep it out of logs.
     resp = httpx.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:embedContent",
-        params={"key": GEMINI_API_KEY},
+        headers={"x-goog-api-key": GEMINI_API_KEY},
         json={
             "content": {"parts": [{"text": text}]},
             "outputDimensionality": GEMINI_DIM,
