@@ -15,15 +15,9 @@ provider "google" {
 }
 
 
-# Cloud Run domyslnie uzywa service account: PROJECT_NUMBER-compute@developer.gserviceaccount.com
-# Nadajemy mu dostep do Firestore
-data "google_project" "project" {}
-
-resource "google_project_iam_member" "cloud_run_firestore" {
-  project = var.project
-  role    = "roles/datastore.user"
-  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
-}
+# NOTE: IAM on project level is intentionally managed outside this Terraform root.
+# This avoids 403 (Policy update access denied) for users/CI without project IAM admin rights.
+# If needed, grant Firestore access manually to the Cloud Run runtime service account.
 
 
 resource "google_cloud_run_v2_service" "product_review_service" {
