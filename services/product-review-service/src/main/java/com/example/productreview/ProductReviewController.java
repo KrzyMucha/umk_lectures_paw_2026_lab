@@ -29,10 +29,7 @@ public class ProductReviewController {
         }
     }
 
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("OK");
-    }
+    
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {

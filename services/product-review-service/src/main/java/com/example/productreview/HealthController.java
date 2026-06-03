@@ -12,3 +12,7 @@ public class HealthController {
         return ResponseEntity.ok("OK");
     }
 }
+    @GetMapping("/product-reviews/health")
+    public ResponseEntity<String> productReviewsHealth() {
+        return ResponseEntity.ok("OK");
+    }
